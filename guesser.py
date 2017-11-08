@@ -13,6 +13,11 @@ def create_model(cell_count, shape, stateful, batch, output_dim):
               stateful=stateful,
 			  return_sequences=True))
     model.add(Dense(cell_count, activation='relu'))
+    model.add(LSTM(cell_count,
+                   input_shape=shape,
+                   batch_size=batch,
+                   stateful=stateful,
+                   return_sequences=True))
     model.add(Dense(output_dim, activation='relu'))
     model.compile(loss='categorical_crossentropy', optimizer='adam', metrics=['accuracy'])
     return model
