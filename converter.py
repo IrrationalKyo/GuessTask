@@ -1,4 +1,4 @@
-from keras.datasets import imdb
+#from keras.datasets import imdb
 import numpy as np
 import math
 
@@ -29,7 +29,7 @@ def text_to_list(fileName):
 def list_to_array(trace_list, training_ratio, time_steps, label_card, label_size=1):
 
 	# data_size := total number of data points that can be generated
-	data_size = math.floor(len(trace_list)/(time_steps + label_size))
+	data_size =len(trace_list) - (time_steps+label_size)
 	# training_size := number of training samples
 	training_size = int(data_size * training_ratio)
 	# test_size := number of test samples
@@ -42,29 +42,121 @@ def list_to_array(trace_list, training_ratio, time_steps, label_card, label_size
 	test_examples = np.zeros((test_size, time_steps, label_card))
 	test_labels = np.zeros((test_size, time_steps, label_card))
 	
-	for i in range(data_size):
+	for l in range(data_size):
 		# if data_size - i < time_steps + label_size:
 		# 	break
-		if i < training_size:
+		if l < training_size:
 			for j in range(time_steps):
 				''' TODO: find the correct index'''
-				task_num = trace_list[i + j]
-				training_examples[i][j][task_num] = 1
-				for k in range(label_size):
+				task_num = trace_list[ l + j]
+				training_examples[l][j][task_num] = 1
+				for k in range(1,label_size+1):
 					''' TODO: find the correct index'''
-					label = trace_list[i + time_steps + j]
-					training_labels[i][j][label] = 1
+					label = trace_list[ l + j + k]
+					training_labels[l][j][label] = 1
 		else:
 			for j in range(time_steps):
-				test_examples[i-training_size][0][j] = trace_list[i+j]
-			for j in range(label_size):
-				label = trace_list[i + time_steps + j]
-				test_labels[i-training_size][0][label] = 1
+				''' TODO: find the correct index'''
+				task_num = trace_list[ l + j]
+				# print("creating label at : " + str(l-training_size) + " .")
+				test_examples[l-training_size][j][task_num] = 1
+				for k in range(1,label_size+1):
+					''' TODO: find the correct index'''
+					label = trace_list[ l + j + k]
+					test_labels[l-training_size][j][label] = 1
+					# print(label)
 	return (training_examples, training_labels), (test_examples,test_labels)
-	
 
-#(train_x, train_y), (test_x,test_y) = list_to_array(text_to_list('dataset_1.txt'), 0.8, 1000, 16)
-#print(len(train_x))
+'''
+	Creates samples so each new example advances by 1 timestep (1 new label example)
+'''
+def sample_creater(trace_list, count, time_steps, label_card, label_size = 1):
+	if count + time_steps + label_size > len(trace_list):
+		raise ValueError("trace_list is too short."
+						 "\tcount = " + str(count) +
+						 "\tlabel_size =" + str(label_size) +
+						 "\tlen(trace_list)" + str(len(trace_list)))
+	if time_steps >= len(trace_list):
+		raise ValueError("time_steps is larger than trace_list.\ntrace_list is too short"
+			  "\ttime_steps = " + str(time_steps) +
+			  "\tlen(trace_list)" + str(len(trace_list)))
+
+	example = np.zeros((count, time_steps, label_card))
+	label = np.zeros((count, time_steps, label_card))
+
+	for l in range(count):
+		for j in range(time_steps):
+			''' TODO: find the correct index'''
+			task_num = trace_list[l + j]
+			example[l][j][task_num] = 1
+			for k in range(1, label_size + 1):
+				''' TODO: find the correct index'''
+				task_num = trace_list[l + j + k]
+				label[l][j][task_num] = 1
+	return example, label
+
+'''
+	requires the length of the trace_list to be divisible by count.
+'''
+def sample_creater_disjoint(trace_list, count, time_steps, label_card, label_size = 1):
+
+	example_len = (label_size + time_steps)
+
+	example = np.zeros((count, time_steps, label_card))
+	label = np.zeros((count, time_steps, label_card))
+
+	for i in range(count):
+		for j in range(time_steps):
+			task_num = trace_list[i*(example_len) + j]
+			example[i][j][task_num] = 1
+			for k in range(1,1+label_size):
+				label_num = trace_list[i*(example_len) + j + k]
+				label[i][j][label_num] = 1
+
+	return example, label
+
+
+def list_to_array2(trace_list, training_ratio, time_steps, label_card, label_size=1):
+	# data_size := total number of data points that can be generated
+	data_size = len(trace_list) - (time_steps + label_size)
+	# training_size := number of training samples
+	training_size = int(data_size * training_ratio)
+	# test_size := number of test samples
+	test_size = data_size - training_size
+
+	# training_examples = np.zeros((training_size, time_steps, label_card))
+	# training_labels = np.zeros((training_size, time_steps, label_card))
+
+	# test_examples = np.zeros((test_size, time_steps, label_card))
+	# test_labels = np.zeros((test_size, time_steps, label_card))
+
+	training_examples, training_labels = sample_creater(trace_list[:training_size + time_steps +label_size],
+														training_size,
+														time_steps,
+														label_card)
+	test_examples, test_labels = sample_creater(trace_list[training_size:],
+												  test_size,
+												  time_steps,
+												  label_card)
+
+	return (training_examples, training_labels), (test_examples, test_labels)
+
+
+(train_x, train_y), (test_x,test_y) = list_to_array(text_to_list('dataset_1.txt'), 0.8, 100, 16)
+
+(train_x2, train_y2), (test_x2,test_y2) = list_to_array2(text_to_list('dataset_1.txt'), 0.8, 100, 16)
+
+print(train_x[0].shape)
+print(train_x2[0].shape)
+
+if not np.array_equal(train_x[0], train_x2[0]):
+	print("train_x is different")
+if not np.array_equal(train_y, train_y2):
+	print("train_y is different")
+if not np.array_equal(test_x, test_x2):
+	print("test_x is different")
+if not np.array_equal(test_y, test_y2):
+	print("test_y is different")
 
 #(X_train, y_train), (X_test, y_test) = imdb.load_data(num_words=5000)
 #print("train_x shape:" + str(X_train.shape))
