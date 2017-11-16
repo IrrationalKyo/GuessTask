@@ -5,6 +5,8 @@ from keras.layers import LSTM
 import matplotlib.pyplot as plt
 import numpy as np
 import math
+# for custom metrics
+import keras.backend as K
 
 import converter as cvt
 
@@ -24,6 +26,13 @@ def score_display(fold_scores):
     return total_avg
 
 
+
+def mean_pred(y_true, y_pred):
+
+    return K.mean(y_pred)
+
+
+
 def create_model(cell_count, shape, stateful, batch, output_dim):
     model = Sequential()
     model.add(LSTM(cell_count,
@@ -33,11 +42,11 @@ def create_model(cell_count, shape, stateful, batch, output_dim):
 			  return_sequences=True))
     # model.add(Dense(cell_count, activation='relu'))
     # # model.add(Dropout(0.3))
-    # model.add(LSTM(cell_count,
-    #                input_shape=(cell_count,output_dim),
-    #                batch_size=batch,
-    #                stateful=stateful,
-    #                return_sequences=True))
+    model.add(LSTM(cell_count,
+                   input_shape=(cell_count,output_dim),
+                   batch_size=batch,
+                   stateful=stateful,
+                   return_sequences=True))
     model.add(Dense(output_dim, activation='relu'))
     model.compile(loss='poisson', optimizer='adam', metrics=['accuracy'])
     return model
@@ -50,14 +59,16 @@ def run(filename, fold_count, n, label_card, factor, validation_frac):
     # folds = cvt.generate_folds(fold_count, raw_data[:math.floor(len(raw_data)/factor)], validation_frac, n, label_card)
     pure_raw_data = cvt.text_to_list(filename)
     raw_data = cvt.list_to_example(pure_raw_data,label_card,n)
-    folds = cvt.generate_folds2(5,raw_data)
-    print(folds[0][1][0].shape)
+    print(len(raw_data[0]))
+    print("divided len: " + str(len(raw_data[0][:int(len(raw_data[0])/2)])))
+    folds = cvt.generate_folds2(5,(raw_data[0][:int(len(raw_data[0])/2)],raw_data[1][:int(len(raw_data[1])/2)]))
+    # print(folds[0][1][0].shape)
     fold_scores = []
 
     for i in range(fold_count):
-        model = create_model(50, (n, label_card), True, 1, label_card)
+        model = create_model(25, (n, label_card), True, 1, label_card)
         train = folds[i]
-        fit_history = model.fit(train[0], train[1], epochs=5, batch_size=1, verbose=1)
+        fit_history = model.fit(train[0], train[1], epochs=10, batch_size=1, verbose=1)
 
         score_list = []
         for  j in range(fold_count):
