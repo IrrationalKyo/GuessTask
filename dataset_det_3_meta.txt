@@ -1,0 +1,31 @@
+14:21:28.602 [main] INFO  console - Test starts.
+14:21:28.608 [main] INFO  console - TaskSet(0.5058409198586796):
+	Task-6: p=930, c=46, pri=1, offset=595
+	Task-11: p=900, c=7, pri=2, offset=411
+	Task-7: p=860, c=47, pri=3, offset=698
+	Task-4: p=790, c=19, pri=4, offset=127
+	Task-2: p=750, c=29, pri=5, offset=524
+	Task-9: p=730, c=6, pri=6, offset=697
+	Task-3: p=670, c=19, pri=7, offset=157
+	Task-1: p=650, c=19, pri=8, offset=106
+	Task-13: p=590, c=11, pri=9, offset=210
+	Task-14: p=580, c=11, pri=10, offset=275
+	Task-15: p=480, c=16, pri=11, offset=24
+	Task-5: p=400, c=22, pri=12, offset=116
+	Task-8: p=390, c=29, pri=13, offset=136
+	Task-10: p=370, c=10, pri=14, offset=14
+	Task-12: p=210, c=8, pri=15, offset=71
+
+14:21:28.609 [main] INFO  console - Task Hyper-period: -316799424410810016
+14:21:28.610 [main] INFO  console - Observation Upper bound1: 498559/900 = 553
+14:21:28.610 [main] INFO  console - Observation Upper bound2: 362700/900 = 403
+14:21:29.480 [main] INFO  console - Victim Task: Task-11: p=900, c=7, pri=2, offset=411
+14:21:29.480 [main] INFO  console - Observer Task: Task-6: p=930, c=46, pri=1, offset=595
+14:21:29.481 [main] INFO  console - O(ov) = 1.5333333333333334
+14:21:29.481 [main] INFO  console - Victim task's smallest C = 7
+14:21:29.481 [main] INFO  console - Observation Upper bound1: 498559/900 = 553
+14:21:29.481 [main] INFO  console - Observation Upper bound2: 362700/900 = 403
+14:21:29.491 [main] INFO  console - 
+Most Weighted Intervals: [[115, 120] => 5]
+14:21:29.491 [main] INFO  console - Most Weighted Value: 11
+14:21:30.222 [main] INFO  console - The number of observed BIs: 182
