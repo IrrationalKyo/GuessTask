@@ -1,14 +1,13 @@
+import keras
 from keras.models import Sequential
 from keras.layers import Dense
 from keras.layers import Dropout
 from keras.layers import LSTM
 import matplotlib.pyplot as plt
 import numpy as np
-import math
-# for custom metrics
-import keras.backend as K
-
+from sklearn.metrics import confusion_matrix
 import converter as cvt
+
 
 def score_display(fold_scores):
     fold_count = len(fold_scores)
@@ -24,12 +23,6 @@ def score_display(fold_scores):
     total_avg = np.mean(avg)
     print("total_avg: " + str(total_avg))
     return total_avg
-
-
-
-def mean_pred(y_true, y_pred):
-
-    return K.mean(y_pred)
 
 
 
@@ -50,7 +43,9 @@ def create_model(cell_count, shape, stateful, batch, output_dim):
     model.add(Dense(output_dim, activation='relu'))
     model.compile(loss='poisson', optimizer='adam', metrics=['accuracy'])
     return model
-
+'''
+    n = time steps
+'''
 def run(filename, fold_count, n, label_card, factor, validation_frac):
     # raw_data = cvt.text_to_list(filename)
 
@@ -59,8 +54,8 @@ def run(filename, fold_count, n, label_card, factor, validation_frac):
     # folds = cvt.generate_folds(fold_count, raw_data[:math.floor(len(raw_data)/factor)], validation_frac, n, label_card)
     pure_raw_data = cvt.text_to_list(filename)
     raw_data = cvt.list_to_example(pure_raw_data,label_card,n)
-    print(len(raw_data[0]))
-    print("divided len: " + str(len(raw_data[0][:int(len(raw_data[0])/2)])))
+    # print(len(raw_data[0]))
+    # print("divided len: " + str(len(raw_data[0][:int(len(raw_data[0])/2)])))
     folds = cvt.generate_folds2(5,(raw_data[0][:int(len(raw_data[0])/2)],raw_data[1][:int(len(raw_data[1])/2)]))
     # print(folds[0][1][0].shape)
     fold_scores = []
@@ -75,14 +70,27 @@ def run(filename, fold_count, n, label_card, factor, validation_frac):
             if i == j:
                 continue
             model.reset_states()
+            # manually call predict
             scores = model.evaluate(folds[j][0], folds[j][1], batch_size=1, verbose=0)
             score_list.append(scores)
         fold_scores.append(score_list)
 
     score_display(fold_scores)
 
-dataset = {'dataset_det_1.txt', 'dataset_det_1.txt'}
-set_n ={50,75,100,150,200,300}
+def manual_verification(model, test_dataset, batch_size=1):
+    model.reset_states()
+    for x in test_dataset:
+        y = model.predict(x)
+        print(y)
+        exit()
 
 
-run('dataset_new_det_1.txt',5,1,16,2,0)
+if __name__ == "__main__":
+    dataset = {'dataset_det_1.txt', 'dataset_det_1.txt'}
+    set_n ={50,75,100,150,200,300}
+
+    run('dataset_new_det_1.txt',5,1,16,2,0)
+
+    pure_raw_data = cvt.text_to_list('dataset_det_1.txt')
+    raw_data = cvt.list_to_example(pure_raw_data,16,1)
+    print(raw_data[0])
