@@ -1,3 +1,10 @@
 __pycache__
 .idea
 ~$
+*.jar
+data/
+old/
+result/
+previous_result/
+metas/
+stats/
