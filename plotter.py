@@ -1,15 +1,18 @@
 import itertools
 import numpy as np
 import matplotlib.pyplot as plt
-
+import sys
+from os import listdir
+from os.path import isfile, join, abspath
+import csv
 from sklearn import svm, datasets
 from sklearn.model_selection import train_test_split
 from sklearn.metrics import confusion_matrix
 
 
-
+''' this code is from tutorial'''
 def plot_confusion_matrix(cm, classes,
-                          normalize=False,
+                          normalize=True,
                           title='Confusion matrix',
                           cmap=plt.cm.Blues):
     """
@@ -36,11 +39,24 @@ def plot_confusion_matrix(cm, classes,
     for i, j in itertools.product(range(cm.shape[0]), range(cm.shape[1])):
         plt.text(j, i, format(cm[i, j], fmt),
                  horizontalalignment="center",
+                 fontsize=10,
                  color="white" if cm[i, j] > thresh else "black")
 
-    plt.tight_layout()
+
     plt.ylabel('True label')
     plt.xlabel('Predicted label')
+    plt.tight_layout()
+
+
+
+def confusion_parser(file_dir):
+    with open(file_dir, 'r') as f:
+        reader = csv.reader(f)
+        return np.array(list(reader),dtype=np.float32)
+        # print(list(reader))
+
+def average_confusion(list_of_confusion):
+    total_confusion = np.zero(list_of_confusion[0].shape)
 
 
 # # Plot normalized confusion matrix
@@ -49,3 +65,21 @@ def plot_confusion_matrix(cm, classes,
 #                       title='Normalized confusion matrix')
 #
 # plt.show()
+
+if __name__ == "__main__":
+    directory = "./result_varification"
+    onlyfiles = [f for f in listdir(abspath(directory)) if isfile(join(abspath(directory), f))]
+    for f in onlyfiles:
+        fl = f.split(".")
+        if fl[-1] == str("confusion"):
+            cnf_mat = confusion_parser(directory+"/"+f)
+            plt.figure(figsize=(10,10), dpi=100)
+            plot_confusion_matrix(cnf_mat, classes=range(16), normalize=True,
+                                  title='Normalized confusion matrix')
+
+            plt.savefig(directory+"/"+fl[0]+"normalized.png")
+            plt.figure(figsize=(10, 10), dpi=100)
+            plot_confusion_matrix(cnf_mat.astype(int), classes=range(16), normalize=False,
+                                  title='Non-Normalized confusion matrix')
+
+            plt.savefig(directory+"/"+fl[0] + ".png")

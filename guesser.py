@@ -30,7 +30,7 @@ def score_display(fold_scores):
 
 
 
-def create_model(cell_count, shape, stateful, batch, output_dim, loss="poisson"):
+def create_model(cell_count, shape, stateful, batch, output_dim, loss="poisson", drop_out = False):
     model = Sequential()
     model.add(LSTM(cell_count,
               input_shape=shape,
@@ -38,7 +38,8 @@ def create_model(cell_count, shape, stateful, batch, output_dim, loss="poisson")
               stateful=stateful,
 			  return_sequences=True))
     model.add(Dense(cell_count, activation='relu'))
-    # model.add(Dropout(0.3))
+    if drop_out:
+        model.add(Dropout(0.3))
     model.add(LSTM(cell_count,
                    input_shape=(cell_count,output_dim),
                    batch_size=batch,
@@ -50,20 +51,20 @@ def create_model(cell_count, shape, stateful, batch, output_dim, loss="poisson")
 '''
     n = time steps
 '''
-def run(filename, fold_count, time_step, label_card):
+def run(filename, fold_count, time_step, label_card, gap, batchSize):
     pure_raw_data = cvt.text_to_list(filename)
-    raw_data = cvt.list_to_example_overlap_100(pure_raw_data,label_card)
+    raw_data = cvt.list_to_example_overlap(pure_raw_data, label_card)
 
-    folds = cvt.generate_folds2(5,(raw_data[0][:int(len(raw_data[0])/2)],raw_data[1][:int(len(raw_data[1])/2)]))
+    folds = cvt.generate_folds(5, (raw_data[0][:int(len(raw_data[0]) / 2)], raw_data[1][:int(len(raw_data[1]) / 2)]))
 
     fold_scores = []
     true_fold_scores = []
 
     for i in range(fold_count):
-        model = create_model(100, (time_step, label_card), True, batch=1, output_dim=label_card, loss="categorical_crossentropy")
+        model = create_model(100, (time_step, label_card), True, batch=batchSize, output_dim=label_card, loss="categorical_crossentropy")
         train = folds[i]
-        fit_history = model.fit(train[0], train[1], epochs=1, batch_size=1, verbose=1)
-        model.save("foldIndex_" + str(i) + ".model")
+        fit_history = model.fit(train[0], train[1], epochs=1, batch_size=batchSize, verbose=1)
+        model.save("model/foldIndex_" + str(i) + ".model")
         score_list = []
         true_score_list = []
         for  j in range(fold_count):
@@ -71,8 +72,8 @@ def run(filename, fold_count, time_step, label_card):
                 continue
             model.reset_states()
             # manually call predict
-            scores = model.evaluate(folds[j][0], folds[j][1], batch_size=1, verbose=1)
-            confusion, trueAcc = manual_verification_100(model, folds[j], batch_size=1)
+            scores = model.evaluate(folds[j][0], folds[j][1], batch_size=batchSize, verbose=1)
+            confusion, trueAcc = manual_verification_100(model, folds[j], batch_size=batchSize)
 
             save_matrix(confusion, "train_"+str(i)+"_test_"+str(j)+".confusion")
 
@@ -96,18 +97,46 @@ def manual_verification(model, test_dataset, batch_size=1):
     print("correct count: " + str(correct))
     print("acc: " + str(correct / len(y)))
 
+    return (confusion, float(correct / len(y)))
+
 def manual_verification_100(model, test_dataset, batch_size=1):
     model.reset_states()
     y = model.predict(test_dataset[0], batch_size=batch_size)
     # otuput shape will be the same as the input shape
 
+    label_card = len(y[1][0])
     true_pred_y = []
     true_y = []
     for i in range(len(y)):
-        pred_y = np.argmax(y[i][99])
+        pred_y = np.argmax(y[i][-1])
         true_pred_y.append(pred_y)
-        label = np.argmax(test_dataset[1][i][99])
+        label = np.argmax(test_dataset[1][i][-1])
         true_y.append(label)
+
+    confusion = confusion_matrix(true_y, true_pred_y , labels=range(label_card))
+
+    correct = 0
+    for i in range(label_card):
+        correct+=confusion[i][i]
+    print("correct count: " + str(correct))
+    print("acc: " + str(correct / len(y)))
+
+    return (confusion, float(correct / len(y)))
+
+def manual_verification_disjoint(model, test_dataset, batch_size=1):
+    model.reset_states()
+    y = model.predict(test_dataset[0], batch_size=batch_size)
+    # otuput shape will be the same as the input shape
+    time_step = len(y[1])
+    print("time_step" + str(time_step))
+    true_pred_y = []
+    true_y = []
+    for i in range(len(y)):
+        for j in range(time_step):
+            pred_y = np.argmax(y[i][j])
+            true_pred_y.append(pred_y)
+            label = np.argmax(test_dataset[1][i][j])
+            true_y.append(label)
 
     confusion = confusion_matrix(true_y, true_pred_y , labels=range(16))
 
