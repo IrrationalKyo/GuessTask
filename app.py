@@ -9,6 +9,7 @@ from pathlib2 import Path
 import numpy as np
 import json
 import argparse
+import gc
 
 
 def file_exists(fileName):
@@ -48,6 +49,8 @@ def generate_single_fold(fold_count, data_pair, batch_size=1):
 
 if __name__ == "__main__":
 
+    gc.enable()
+
     """
     parser = argparse.ArgumentParser(description="Parameters for running keras")
     parser.add_argument("-n", "--nsize", help="number of lstm cells perlayer (Default 50)")
@@ -70,6 +73,8 @@ if __name__ == "__main__":
     gap = [False]
     drop_out = [True]
     fold_count = 4
+
+    iteration = 0
 
     for name in fileNames:
         data_list = cvt.newText_to_list(name)[0:200000]
@@ -102,6 +107,9 @@ if __name__ == "__main__":
                                     if file_exists(modelName):
                                         continue
 
+                                    if iteration >= 10:
+                                        exit()
+
                                     print("Going to GENERATE")
                                     folds = generate_single_fold(fold_count,
                                                                  cvt.list_to_example_overlap(data_list, time_steps=time,
@@ -109,6 +117,7 @@ if __name__ == "__main__":
                                                                  batch_size=b_size)
 
                                     i = 1
+                                    iteration += 1
 
                                     fold = folds[0]
                                     x_train = fold[0][0]
@@ -165,4 +174,6 @@ if __name__ == "__main__":
                                     y_train = None;
                                     x_test = None;
                                     y_test = None;
+
+                                    gc.collect();
 
