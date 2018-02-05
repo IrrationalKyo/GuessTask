@@ -1,3 +1,4 @@
+import keras
 import converter as cvt
 import guesser as gue
 import os
@@ -24,7 +25,7 @@ def file_exists(fileName):
 
 def save_result(fileName, data_dict):
     with open(fileName, "w") as file:
-        file.write(json.dumps(data_dict))
+        file.write(json.dumps(data_dict, indent=4, sort_keys=True))
     return
 
 
@@ -131,7 +132,7 @@ if __name__ == "__main__":
 
                                     class_card = len(x_train[0][0])
 
-                                    if file_exists(modelName):
+                                    if not file_exists(modelName):
                                         print("Going to CREATE MODEL")
                                         model = gue.create_model(n_size, (time, class_card), stateful=True,
                                                                  batch=b_size,
@@ -153,6 +154,7 @@ if __name__ == "__main__":
                                         (cnf_mat, acc) = gue.manual_verification_100(model, (x_test, y_test),
                                                                                      batch_size=b_size)
 
+                                    '''
                                     plt.figure(figsize=(10, 10), dpi=100)
                                     plotter.plot_confusion_matrix(cnf_mat, classes=range(class_card),
                                                                   normalize=True,
@@ -167,13 +169,18 @@ if __name__ == "__main__":
 
                                     plt.savefig(
                                         directory + "/" + fileName + "_" + str(acc) + ".png")
+                                    '''
 
                                     normal_cnf_mat = cnf_mat.astype('float') / cnf_mat.sum(axis=1)[:, np.newaxis]
 
                                     statJSON = {}
                                     statJSON["accuracy"] = acc
-                                    statJSON["normalized_matrix"] = normal_cnf_mat
-                                    statJSON["matrix"] = cnf_mat.astype("float")
+                                    statJSON["normalized_matrix"] = {}
+                                    for i in range(class_card):
+                                        statJSON["normalized_matrix"][i]=normal_cnf_mat[i].tolist()
+                                    statJSON["matrix"] = {}
+                                    for i in range(class_card):
+                                        statJSON["matrix"][i]= cnf_mat.astype("float")[i].tolist()
 
                                     '''
                                     for i in range(class_card):
@@ -186,11 +193,11 @@ if __name__ == "__main__":
                                     save_result(directory + "/" + "stat.json", statJSON)
 
 
-                                    fold = None;
-                                    x_train = None;
-                                    y_train = None;
-                                    x_test = None;
-                                    y_test = None;
+                                    fold = None
+                                    x_train = None
+                                    y_train = None
+                                    x_test = None
+                                    y_test = None
 
-                                    gc.collect();
+                                    gc.collect()
 
