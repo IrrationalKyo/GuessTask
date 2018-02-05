@@ -2,6 +2,8 @@ import converter as cvt
 import guesser as gue
 import os
 import plotter
+import matplotlib
+matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 import glob
 import math
@@ -10,6 +12,7 @@ import numpy as np
 import json
 import argparse
 import gc
+
 
 
 def file_exists(fileName):
