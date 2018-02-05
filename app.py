@@ -101,10 +101,11 @@ if __name__ == "__main__":
                                     directory = "./result/" + id
                                     fileName = lo + "_lstm_lstm_fold_n" + str(n_size) + "_e" + str(ep) + "_g" + str(g)
                                     modelName = directory + "/" + fileName + ".model"
+                                    statName = directory + "/stat.json"
 
                                     print("Training: " + str(name) + "\tid: " + str(id))
 
-                                    if file_exists(modelName):
+                                    if file_exists(modelName) and file_exists(statName):
                                         continue
 
                                     if iteration >= 10:
@@ -127,14 +128,18 @@ if __name__ == "__main__":
 
                                     class_card = len(x_train[0][0])
 
-                                    print("Going to CREATE MODEL")
-                                    model = gue.create_model(n_size, (time, class_card), stateful=True,
-                                                             batch=b_size,
-                                                             output_dim=class_card, loss=l, drop_out=out)
-                                    model.fit(x_train, y_train, epochs=ep, batch_size=b_size, verbose=1)
-                                    if not os.path.exists(directory):
-                                        os.makedirs(directory)
-                                    model.save(modelName)
+                                    if file_exists(modelName):
+                                        print("Going to CREATE MODEL")
+                                        model = gue.create_model(n_size, (time, class_card), stateful=True,
+                                                                 batch=b_size,
+                                                                 output_dim=class_card, loss=l, drop_out=out)
+                                        model.fit(x_train, y_train, epochs=ep, batch_size=b_size, verbose=1)
+                                        if not os.path.exists(directory):
+                                            os.makedirs(directory)
+                                        model.save(modelName)
+                                    else:
+                                        model = keras.models.load_model(modelName)
+
                                     i += 1
 
                                     if g > 1:
@@ -162,12 +167,21 @@ if __name__ == "__main__":
 
                                     normal_cnf_mat = cnf_mat.astype('float') / cnf_mat.sum(axis=1)[:, np.newaxis]
 
-                                    statString = ""
+                                    statJSON = {}
+                                    statJSON["accuracy"] = acc
+                                    statJSON["normalized_matrix"] = normal_cnf_mat
+                                    statJSON["matrix"] = cnf_mat.astype("float")
+
+                                    '''
                                     for i in range(class_card):
                                         statString += "task_" + str(i) + ":" + str(normal_cnf_mat[i][i]) + "\n"
 
-                                    save_result(directory + "/" + "stat",
+
+                                    save_result(directory + "/" + "stat.json",
                                                 "accuracy:" + str(acc) + "\n" + statString)
+                                    '''
+                                    save_result(directory + "/" + "stat.json", statJSON)
+
 
                                     fold = None;
                                     x_train = None;
