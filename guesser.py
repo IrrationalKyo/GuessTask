@@ -40,12 +40,14 @@ def create_model(cell_count, shape, stateful, batch, output_dim, loss="poisson",
     model.add(Dense(cell_count, activation='relu'))
     if drop_out:
         model.add(Dropout(0.3))
+    '''
     model.add(LSTM(cell_count,
                    input_shape=(cell_count,output_dim),
                    batch_size=batch,
                    stateful=stateful,
                    return_sequences=True))
-    model.add(Dense(output_dim, activation='relu'))
+    '''
+    model.add(Dense(output_dim, activation='softmax'))
     model.compile(loss=loss, optimizer='adam', metrics=['accuracy'])
     return model
 '''

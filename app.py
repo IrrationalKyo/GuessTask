@@ -70,9 +70,9 @@ if __name__ == "__main__":
 
     fileNames = glob.glob('./data/*.data')
     loss = ["categorical_crossentropy"]
-    node_size = [50]
+    node_size = [100]
     batch_size = [1000]
-    epoch = [30]
+    epoch = [7]
     time_steps = [100]
     gap = [False]
     drop_out = [True]
