@@ -1,5 +1,6 @@
 from os import listdir
 from os.path import isfile, join
+import os
 import copy as cp
 import re
 
@@ -11,8 +12,9 @@ class DirectoryOrganizer:
 
 
     @staticmethod
-    def parse_name(self, filename):
+    def parse_name(filename):
         # delimits when number to letter or letter to number occurs
+        print(filename)
         temp =  re.split('(\d+)',filename)
         tasksize = int(temp[1])
         rep_count = int(temp[3])
@@ -20,12 +22,12 @@ class DirectoryOrganizer:
 
 
     @staticmethod
-    def reconstruct_name(self, tasksize, rep_count):
+    def reconstruct_name(tasksize, rep_count):
         return "size" + str(tasksize) + "rep" + str(rep_count)
 
 
     @staticmethod
-    def dict_to_name(self, dictionary):
+    def dict_to_name(dictionary):
         name_set = set()
         for tasksize, rep_set in dictionary.items():
             for rep_count in rep_set:
@@ -62,11 +64,18 @@ class DirectoryOrganizer:
         return this_dir_dictionary
 
 
-Class ResultOrganizer(DirectoryOrganizer):
+class ResultOrganizer(DirectoryOrganizer):
 
-    def __init__(self):
-        super(ResultOrganizer, self).__init__()
+    def __init__(self, directory):
+        super().__init__(directory)
         # TODO: filter out the ones without models
+        # DONE
+        for tasksize, rep_set in self.dir_dict.items():
+            for rep_count in rep_set:
+                if (not self.model_exist(tasksize, rep_count)) \
+                    or (not self.stat_exist(tasksize, rep_count)):
+                    rep_set.remove(rep_count)
+
 
     '''
         TODO: could refact name parsing in *_exist methods
@@ -112,26 +121,23 @@ Class ResultOrganizer(DirectoryOrganizer):
                 return True
         return False
 
-Class DataResultOrganizer:
+class DataResultOrganizer:
 
     def __init__(self, data_dir, result_dir):
         self.org_data = DirectoryOrganizer(data_dir)
         self.org_result = ResultOrganizer(result_dir)
 
     def get_unprocessed_data_name(self):
-        checked
-        for tasksize, rep_set in org_result.dir_dict.items():
+        output_string = [];
+        for tasksize, rep_set in (self.org_data - self.org_result).items():
             for rep_count in rep_set:
-                org_result.model_exist(tasksize,rep_count)
-
-
-
-    def get_untested_model_name(self):
-
-
+                output_string.append(DirectoryOrganizer.reconstruct_name(tasksize, rep_count)+".data")
+        return output_string
+        
 
 if __name__ == "__main__":
-    org_metas = DirectoryOrganizer("./metas")
-    org_data = DirectoryOrganizer("./data")
-    print(org_metas-org_data)
-    # TODO: test ResultOrganizer
+    # org_metas = DirectoryOrganizer("./metas")
+    # org_result = ResultOrganizer("./result")
+
+    drorg = DataResultOrganizer("./metas", "./result")
+    print(drorg.get_unprocessed_data_name())
