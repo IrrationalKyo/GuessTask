@@ -1,5 +1,5 @@
-import converter as cvt
-import guesser as gue
+import taskrecon_converter as cvt
+import taskrecon_guesser as gue
 import os
 import plotter
 import matplotlib.pyplot as plt
