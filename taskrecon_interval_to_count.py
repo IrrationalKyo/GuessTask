@@ -181,7 +181,7 @@ def partition_train_test(data_dict, ratio):
 
     for label, vec_data in data_dict.items():
         data_len = len(vec_data)
-        index_list = np.random.perumation(data_len)
+        index_list = np.random.permuation(data_len)
         for i in range(math.floor(data_len * ratio)):
             train_x.append(vec_data[index_list[i]])
             train_y.append(label)
