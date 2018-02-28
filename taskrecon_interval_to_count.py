@@ -1,7 +1,7 @@
 import random
 import math
 import numpy as np
-from keras.layers import Input, Convolution2D, MaxPooling2D, Dense, Dropout, Flatten
+from keras.layers import Input, Convolution2D, MaxPooling2D, Dense, Dropout, Flatten, Conv1D, CuDNNGRU
 from keras.models import Sequential
 import  keras.models as km
 
@@ -109,27 +109,67 @@ class Converter:
             vec_o_tup_output.append((vec_i, int_group_label))
         return vec_o_tup_output
 
+    def partition_train_test(data_dict, ratio):
+        train_x = []
+        train_y = []
+        test_x = []
+        test_y = []
+        remapped_x = []
+        remapped_y = []
+
+        for label, vec_data in data_dict.items():
+            data_len = len(vec_data)
+            index_list = np.random.permutation(data_len)
+            for i in range(math.floor(data_len * ratio)):
+                train_x.append(vec_data[index_list[i]])
+                train_y.append(label)
+            for i in range(math.floor(data_len * ratio), data_len):
+                test_x.append(vec_data[index_list[i]])
+                test_y.append(label)
+
+        index_list = np.random.permutation(len(train_x))
+        for i in range(len(train_x)):
+            remapped_x.append(train_x[index_list[i]])
+            remapped_y.append(train_y[index_list[i]])
+        train_x = remapped_x
+        train_y = remapped_y
+
+        remapped_x = []
+        remapped_y = []
+        index_list = np.random.permutation(len(test_x))
+        for i in range(len(test_x)):
+            remapped_x.append(test_x[index_list[i]])
+            remapped_y.append(test_y[index_list[i]])
+        test_x = remapped_x
+        test_y = remapped_y
+
+        return train_x, train_y, test_x, test_y
+
+
+
+
+class ModelReg:
+
+    def __init__(self, int_cell_count, int_rows):
+        self._int_cell_count = int_cell_count
+        self._model = None
+        self.create_model(int_rows)
+
+    # each row is a data point
+    # each column is a feature(i.e. single interval in this case)
+    def create_model(self, trace_length):
+        print("length of a trace" + str(trace_length))
+        self._model = Sequential()
+        self._model.add(CuDNNGRU(10, batch_input_shape=(1,trace_length, INT_STATE_COUNT)))
+        self._model.add(Dense(trace_length, activation='tanh', name="input_player", batch_size=1))
+        self._model.add(Dense(500, activation='tanh', name="dense1"))
+        self._model.add(Dense(10, activation='tanh', name="dense2"))
+        self._model.add(Dense(1, activation='linear', name="output_player"))
+        self._model.compile(loss="mse", optimizer='sgd', metrics=["accuracy"])
+        # returns datapoint and its label (each data point is a list of vectorize() output from different dataset)
+
     @staticmethod
-    def vec_o_tup_to_mat(vec_o_tup_list):
-        int_list_len = len(vec_o_tup_list)
-        int_datum_len = len(vec_o_tup_list[0][0])
-        mat_x = np.zeros((int_list_len, int_datum_len, INT_STATE_COUNT))
-        mat_y = np.zeros((int_list_len, 1))
-        int_insertion_index = 0
-        for tup_i in vec_o_tup_list:
-
-            for i in range(int_datum_len):
-
-                mat_x[int_insertion_index][i][tup_i[0][i][0]]=tup_i[0][i][1]
-            mat_y[int_insertion_index][0] = tup_i[1]
-            int_insertion_index += 1
-
-        return (mat_x, mat_y)
-
-
-    # returns datapoint and its label (each data point is a list of vectorize() output from different dataset)
-    @staticmethod
-    def prep_train_test(vec_o_tup_x, float_train_ratio):
+    def prep_train_test_reg(vec_o_tup_x, float_train_ratio):
         #
         int_total_len = len(vec_o_tup_x)
         int_train_len = math.floor(int_total_len * float_train_ratio)
@@ -138,74 +178,113 @@ class Converter:
         vec_o_tup_train = vec_o_tup_x[:int_train_len]
         vec_o_tup_test = vec_o_tup_x[-1 * int_test_len:]
 
-        mat_train_x, mat_train_y = Converter.vec_o_tup_to_mat(vec_o_tup_train)
-        mat_test_x, mat_test_y = Converter.vec_o_tup_to_mat(vec_o_tup_test)
+        mat_train_x, mat_train_y = Converter.vec_o_tup_to_mat_reg(vec_o_tup_train)
+        mat_test_x, mat_test_y = Converter.vec_o_tup_to_mat_reg(vec_o_tup_test)
 
-        return  mat_train_x, mat_train_y, mat_test_x, mat_test_y
+        return mat_train_x, mat_train_y, mat_test_x, mat_test_y
+        # returns datapoint and its label (each data point is a list of vectorize() output from different dataset)
 
     # takes a vector of traces with corresponding labels
     # Inflates the data by convoluting window
     @staticmethod
-    def data_prep(vec_o_vec_trace, int_window_len, int_conv_count, vec_labels, int_window_slide = None):
+    def data_prep_reg(vec_o_vec_trace, int_window_len, int_conv_count, vec_labels, int_window_slide=None):
         vec_o_tup_samples = []
         for i in range(len(vec_o_vec_trace)):
-            vec_o_vec_convoluted_bunch = Converter.data_convolutor(Converter.vectorize(vec_o_vec_trace[i]), int_window_len , int_conv_count, int_window_slide)
+            data_vec = Converter.vectorize(vec_o_vec_trace[i])
+            vec_o_vec_convoluted_bunch = Converter.data_convolutor(data_vec, 500 , 4, None)
             vec_o_tup_samples += Converter.assign_label(vec_o_vec_convoluted_bunch, vec_labels[i])
-        return Converter.vec_o_tup_to_mat(vec_o_tup_samples)
+        return ModelReg.vec_o_tup_to_mat_reg(vec_o_tup_samples)
 
-class Model:
 
-    def __init__(self, int_cell_count):
+    # The data points become one dimentional per vector
+    @staticmethod
+    def vec_o_tup_to_mat_reg(vec_o_tup_list):
+        int_list_len = len(vec_o_tup_list)
+        int_datum_len = len(vec_o_tup_list[0][0])
+        mat_x = np.zeros((int_list_len, int_datum_len, INT_STATE_COUNT))
+        mat_y = np.zeros((int_list_len, 1))
+        int_insertion_index = 0
+        for tup_i in vec_o_tup_list:
+
+            for i in range(int_datum_len):
+                state = tup_i[0][i][0]
+                if state > 0:
+                    state = 1
+                else:
+                    state = 0
+                mat_x[int_insertion_index][i][state] = tup_i[0][i][1]
+            mat_y[int_insertion_index][0] = tup_i[1]
+            int_insertion_index += 1
+
+        return (mat_x, mat_y)
+
+class ModelOhv:
+
+    def __init__(self, int_cell_count, int_rows, int_columns):
         self._int_cell_count = int_cell_count
         self._model = None
-        self.create_model()
+        self.create_model(int_rows, int_columns)
 
     # each row is a data point
     # each column is a feature(i.e. single interval in this case)
     def create_model(self, int_rows, int_columns):
+        print()
         self._model = Sequential()
-        self._model.add(Dense(100, input_shape=(int_rows, int_columns), activation='relu'))
-        self._model.add(Dense(50, activation='relu'))
-        self._model.add(Dense(25, activation='relu'))
-        self._model.add(Dense(1, activation='linear'))
-        self._model.compile(loss="mse", optimizer='adam', metrics=["accuracy"])
+        self._model.add(CuDNNGRU(10, batch_input_shape=(1, int_rows, INT_STATE_COUNT)))
+        self._model.add(Dense(int_rows, activation='tanh', name="input_player", batch_size=1))
+        self._model.add(Dense(500, activation='tanh', name="dense1"))
+        self._model.add(Dense(20, activation='softmax', name="output_player"))
+        self._model.compile(loss="categorical_crossentropy", optimizer='adam', metrics=["accuracy"])
+        # returns datapoint and its label (each data point is a list of vectorize() output from different dataset)
+
+        # label is represented in one hot vector
+
+    @staticmethod
+    def vec_o_tup_to_mat_ohv(vec_o_tup_list, max_label_card=20):
+        int_list_len = len(vec_o_tup_list)
+        int_datum_len = len(vec_o_tup_list[0][0])
+        mat_x = np.zeros((int_list_len, int_datum_len, INT_STATE_COUNT))
+        mat_y = np.zeros((int_list_len, 20))
+        int_insertion_index = 0
+        for tup_i in vec_o_tup_list:
+
+            for i in range(int_datum_len):
+                mat_x[int_insertion_index][i][tup_i[0][i][0]] = tup_i[0][i][1]
+            mat_y[int_insertion_index][tup_i[1]] = 1
+            int_insertion_index += 1
+
+        return (mat_x, mat_y)
+
+    @staticmethod
+    def prep_train_test_ohv(vec_o_tup_x, float_train_ratio):
+        #
+        int_total_len = len(vec_o_tup_x)
+        int_train_len = math.floor(int_total_len * float_train_ratio)
+        int_test_len = int_total_len - int_train_len
+
+        vec_o_tup_train = vec_o_tup_x[:int_train_len]
+        vec_o_tup_test = vec_o_tup_x[-1 * int_test_len:]
+
+        mat_train_x, mat_train_y = Converter.vec_o_tup_to_mat_ohv(vec_o_tup_train)
+        mat_test_x, mat_test_y = Converter.vec_o_tup_to_mat_ohv(vec_o_tup_test)
+
+        return mat_train_x, mat_train_y, mat_test_x, mat_test_y
+
+    # takes a vector of traces with corresponding labels
+    # Inflates the data by convoluting window
+    @staticmethod
+    def data_prep_ohv(vec_o_vec_trace, int_window_len, int_conv_count, vec_labels, int_window_slide=None):
+        vec_o_tup_samples = []
+        for i in range(len(vec_o_vec_trace)):
+            data_vec = Converter.vectorize(vec_o_vec_trace[i])
+            # vec_o_vec_convoluted_bunch = Converter.data_convolutor(data_vec, len(data_vec) , 1, None)
+            vec_o_tup_samples += Converter.assign_label([data_vec[:int_window_len]], vec_labels[i])
+        return ModelOhv.vec_o_tup_to_mat_ohv(vec_o_tup_samples)
 
 
-def partition_train_test(data_dict, ratio):
-    train_x = []
-    train_y = []
-    test_x = []
-    test_y = []
-    remapped_x= []
-    remapped_y = []
 
-    for label, vec_data in data_dict.items():
-        data_len = len(vec_data)
-        index_list = np.random.permuation(data_len)
-        for i in range(math.floor(data_len * ratio)):
-            train_x.append(vec_data[index_list[i]])
-            train_y.append(label)
-        for i in range(math.floor(data_len * ratio), data_len):
-            test_x.append(vec_data[index_list[i]])
-            test_y.append(label)
 
-    index_list = np.random.permutation(len(train_x))
-    for i in range(len(train_x)):
-        remapped_x.append(train_x[index_list[i]])
-        remapped_y.append(train_y[index_list[i]])
-    train_x = remapped_x
-    train_y = remapped_y
 
-    remapped_x= []
-    remapped_y= []
-    index_list = np.random.permutation(len(test_x))
-    for i in range(len(test_x)):
-        remapped_x.append(test_x[index_list[i]])
-        remapped_y.append(test_y[index_list[i]])
-    test_x = remapped_x
-    test_y = remapped_y
-
-    return train_x, train_y, test_x, test_y
 
 
 
@@ -263,13 +342,15 @@ if __name__ == "__main__":
             file.close()
 
 
-    train_x, train_y, test_x, test_y = partition_train_test(data_dict, 0.75)
-    train_x, train_y = Converter.data_prep(train_x, 5000, 2, train_y)
-    test_x, test_y = Converter.data_prep(test_x, 5000, 2, test_y)
+    train_x, train_y, test_x, test_y = Converter.partition_train_test(data_dict, 0.75)
+    train_x, train_y = ModelOhv.data_prep_ohv(train_x, 500, 1, train_y)
+    test_x, test_y = ModelOhv.data_prep_ohv(test_x, 500, 1, test_y)
 
-    print(test_x)
+    print(len(train_x))
 
+    mod = ModelOhv(100, len(train_x[0]), None)
+    model = mod._model
 
-    # mod = Model(100)
-    # model = mod._model
+    model.fit(train_x, train_y, batch_size= 1, epochs=20, verbose=2)
+    print(model.evaluate(test_x, test_y, batch_size=1))
 
