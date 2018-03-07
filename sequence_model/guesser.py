@@ -148,18 +148,26 @@ def save_matrix(matrix, filename):
 
 if __name__ == "__main__":
 
-    trace = cvt.newText_to_list("./data/size15rep0.data") [100: 100000]
-    example = cvt.list_to_example_sequence(trace, offset=0, pred_len=1)
-
+    trace = cvt.newText_to_list("./data/size5rep0.data") [:100]
+    for t in trace:
+        if not isinstance(t, int):
+            print("Not parsing correctly {}".format(t))
+    example = cvt.list_to_example_sequence(trace, 16, offset=0, pred_len=1)
     for t in example[1]:
         if len(t) != 16:
             print("THIS OFFENDS ME {}".format(t))
     dataset1 = cvt.chunk_examples(example[0], example[1], 0, len(example[0]))
+    print(np.asarray(dataset1[0]))
     train_x, train_y, test_x, test_y = cvt.split_train_test(0.75, example)
+    total_len = len(train_x)
+    total_len -= total_len % 32
+    train_x = train_x[:total_len]
+    train_y = train_y[:total_len]
+    train_x = np.reshape(train_x,  (total_len, 1, len(train_x[0])))
+    train_y = np.reshape(train_y,  (total_len, 1, len(train_y[0])))
 
-    model = create_model(128, dataset1[0].shape(), stateful=True,
+    model = create_model(128, (train_x.shape[1],train_x.shape[2]), stateful=True,
                          batch=32,
-                         output_dim=dataset1[1].shape())
-    model.fit(dataset1[0], dataset1[1], epochs=20, batch_size=32, verbose=1)
-
+                         output_dim=16)
+    model.fit(train_x, train_y, epochs=20, batch_size=32, verbose=1)
 
