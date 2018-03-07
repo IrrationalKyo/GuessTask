@@ -1,17 +1,9 @@
 import keras
 from keras.models import Sequential
-from keras.layers import Dense
-from keras.layers import Dropout
-from keras.layers import LSTM
-import matplotlib.pyplot as plt
+from keras.layers import Dense, Dropout, CuDNNLSTM
 import numpy as np
 from sklearn.metrics import confusion_matrix
-import taskrecon_converter as cvt
-from keras.models import load_model
-import matplotlib.pyplot as plt
-
-import time
-
+import converter as cvt
 
 def score_display(fold_scores):
     fold_count = len(fold_scores)
@@ -30,34 +22,27 @@ def score_display(fold_scores):
 
 
 
-def create_model(cell_count, shape, stateful, batch, output_dim, loss="poisson", drop_out = False):
+def create_model(cell_count, shape, stateful, batch, output_dim, loss="categorical_crossentropy", drop_out = True):
     model = Sequential()
-    model.add(LSTM(cell_count,
+    model.add(CuDNNLSTM(cell_count,
               input_shape=shape,
 			  batch_size=batch,
               stateful=stateful,
 			  return_sequences=True))
     model.add(Dense(cell_count, activation='relu'))
     if drop_out:
-        model.add(Dropout(0.3))
-    '''
-    model.add(LSTM(cell_count,
-                   input_shape=(cell_count,output_dim),
-                   batch_size=batch,
-                   stateful=stateful,
-                   return_sequences=True))
-    '''
+        model.add(Dropout(0.5))
+
     model.add(Dense(output_dim, activation='softmax'))
-    model.compile(loss=loss, optimizer='adam', metrics=['accuracy'])
+    model.compile(loss=loss, optimizer='sgd', metrics=['accuracy'])
     return model
-'''
-    n = time steps
-'''
+
+
 def run(filename, fold_count, time_step, label_card, gap, batchSize):
     pure_raw_data = cvt.text_to_list(filename)
-    raw_data = cvt.list_to_example_overlap(pure_raw_data, label_card)
+    raw_data = cvt.list_to_example_sequence(pure_raw_data, label_card)
 
-    folds = cvt.generate_folds(5, (raw_data[0][:int(len(raw_data[0]) / 2)], raw_data[1][:int(len(raw_data[1]) / 2)]))
+    folds = cvt.split_train_test(5, (raw_data[0][:int(len(raw_data[0]) / 2)], raw_data[1][:int(len(raw_data[1]) / 2)]))
 
     fold_scores = []
     true_fold_scores = []
@@ -163,5 +148,18 @@ def save_matrix(matrix, filename):
 
 if __name__ == "__main__":
 
-    run('dataset_new_det_1.txt', fold_count=5, time_step=100, label_card=16)
+    trace = cvt.newText_to_list("./data/size15rep0.data") [100: 100000]
+    example = cvt.list_to_example_sequence(trace, offset=0, pred_len=1)
+
+    for t in example[1]:
+        if len(t) != 16:
+            print("THIS OFFENDS ME {}".format(t))
+    dataset1 = cvt.chunk_examples(example[0], example[1], 0, len(example[0]))
+    train_x, train_y, test_x, test_y = cvt.split_train_test(0.75, example)
+
+    model = create_model(128, dataset1[0].shape(), stateful=True,
+                         batch=32,
+                         output_dim=dataset1[1].shape())
+    model.fit(dataset1[0], dataset1[1], epochs=20, batch_size=32, verbose=1)
+
 

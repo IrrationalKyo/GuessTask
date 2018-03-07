@@ -1,8 +1,9 @@
 import random
 import math
 import numpy as np
-from keras.layers import Input, Convolution2D, MaxPooling2D, Dense, Dropout, Flatten, Conv1D, CuDNNGRU
+from keras.layers import Input, Convolution2D, MaxPooling2D, Dense, Dropout, Flatten, Conv1D, CuDNNGRU, AveragePooling1D, Reshape, Bidirectional
 from keras.models import Sequential
+from keras import regularizers
 import  keras.models as km
 
 
@@ -51,7 +52,7 @@ class Converter:
 
     # returns a list of intervals. (e.g. [(state, duration), (state, duration), (state, duration)])
     @staticmethod
-    def vectorize(string_trace):
+    def vectorize_old(string_trace):
         # convert trace to intervals
         # state 0 = rest, 1 = busy, 2 = context switch
         vect = []
@@ -81,21 +82,39 @@ class Converter:
             vect.append((0, int_interval_duration))
         return vect
 
+    @staticmethod
+    def vectorize(string_trace):
+        # convert trace to intervals
+        # state 0 = rest, 1 = busy, 2 = context switch
+        vect = []
+
+        for i in range(1, len(string_trace)):
+            value = string_trace[i]
+            if value < 0:
+                vect.append((0, abs(value)))
+            elif value > 0:
+                vect.append((1, abs(value)))
+
+
+        return vect
+
     # returns a randomly shifted convolution of data
     # i.e. a window which will be a data point will be randomly placed in the list of intervals
     # this will be used to multiply the dataset.
     # outputs
     @staticmethod
-    def data_convolutor(vec_x, int_window_length, int_max_count, int_slide = None):
+    def data_convolutor(vec_x, int_window_length, offset, int_slide = None):
         if int_slide is None:
             int_slide = int_window_length
 
         vec_o_vec_output = []
         int_vec_len = len(vec_x)
+
         int_max_index = int_vec_len - int_window_length
-        int_offset = 0
+        int_offset = offset
+        print(str(int_offset) + " : " + str(int_vec_len))
         int_current_count = 0
-        while int_offset < int_max_index and int_current_count < int_max_count:
+        while int_offset < int_max_index:
             vec_o_vec_output.append(vec_x[int_offset:int_offset+int_window_length])
             int_offset += int_slide
             int_current_count += 1
@@ -228,11 +247,22 @@ class ModelOhv:
     # each row is a data point
     # each column is a feature(i.e. single interval in this case)
     def create_model(self, int_rows, int_columns):
-        print()
         self._model = Sequential()
-        self._model.add(CuDNNGRU(10, batch_input_shape=(1, int_rows, INT_STATE_COUNT)))
-        self._model.add(Dense(int_rows, activation='tanh', name="input_player", batch_size=1))
-        self._model.add(Dense(500, activation='tanh', name="dense1"))
+        self._model.add(Bidirectional(CuDNNGRU(100, name="input", return_sequences=True), input_shape=(int_rows, INT_STATE_COUNT)))
+        self._model.add(Bidirectional(CuDNNGRU(50, name="gru_layer_2", return_sequences=False)))
+        # self._model.add(Conv1D(10, 20))
+        # self._model.add(AveragePooling1D())
+        # self._model.add(Conv1D(30, 100,input_shape= (int_rows, INT_STATE_COUNT) , name="conv1"))
+        # self._model.add(AveragePooling1D(5, name="poolclosed"))
+        self._model.add(Dense(500, activation='tanh', name="dense1", batch_size=1, W_regularizer=regularizers.l2(0.01), use_bias=True))
+        # self._model.add(Flatten())
+        self._model.add(Dropout(0.5))
+
+        self._model.add(Dense(100, activation='tanh', name="dense2"))
+        # self._model.add(Dropout(0.5))
+        # self._model(Reshape((300 ,INT_STATE_COUNT)))
+        # self._model.add(Conv1D(30, 500, name="conv1"))
+        # self._model.add(AveragePooling1D(5, name="poolclosed"))
         self._model.add(Dense(20, activation='softmax', name="output_player"))
         self._model.compile(loss="categorical_crossentropy", optimizer='adam', metrics=["accuracy"])
         # returns datapoint and its label (each data point is a list of vectorize() output from different dataset)
@@ -277,8 +307,8 @@ class ModelOhv:
         vec_o_tup_samples = []
         for i in range(len(vec_o_vec_trace)):
             data_vec = Converter.vectorize(vec_o_vec_trace[i])
-            # vec_o_vec_convoluted_bunch = Converter.data_convolutor(data_vec, len(data_vec) , 1, None)
-            vec_o_tup_samples += Converter.assign_label([data_vec[:int_window_len]], vec_labels[i])
+            vec_o_tup_samples += Converter.assign_label(Converter.data_convolutor(data_vec, 500 , 100, None), vec_labels[i])
+            # vec_o_tup_samples += Converter.assign_label([data_vec[:int_window_len]], vec_labels[i])
         return ModelOhv.vec_o_tup_to_mat_ohv(vec_o_tup_samples)
 
 
@@ -323,6 +353,7 @@ if __name__ == "__main__":
     # plot_model(model, to_file='model.png')
     #
     # model.fit(train_x[0], train_x[1])
+
     stop = 0
     onlyfiles = [f for f in listdir("./data/") if isfile(join("./data/", f))]
 
@@ -351,6 +382,6 @@ if __name__ == "__main__":
     mod = ModelOhv(100, len(train_x[0]), None)
     model = mod._model
 
-    model.fit(train_x, train_y, batch_size= 1, epochs=20, verbose=2)
-    print(model.evaluate(test_x, test_y, batch_size=1))
+    model.fit(train_x, train_y, epochs=30, verbose=2, batch_size=32, validation_split=0.1)
+    print(model.evaluate(test_x, test_y))
 

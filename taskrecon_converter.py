@@ -116,6 +116,46 @@ def list_to_example_overlap(trace_list, time_steps=100, offset=0, overlap_gap=1)
     return (list_of_examples, list_of_labels)
 
 
+'''
+    This function requires the time
+    Visual Representation (X = left column, Y = right column)
+    t -           t gapOffset+
+    s  -          s  gapOffset+
+    t   -         t   gapOffset+
+    e    -        e    gapOffset+
+    p     -       p     gapOffset+
+    s      -      s      gapOffset+
+
+    keeping the gap==offset makes X[1] == Y[0]
+'''
+
+def list_to_example_sequence(trace_list, offset=0, pred_len=1):
+    label_card = detect_label_card(trace_list)
+    list_of_examples = []
+    list_of_labels = []
+    sequence_len = len(trace_list)
+
+
+    #  TODO: PARALLZELIZE THIS, OR MAY BE NOT. THE PROBLEM WAS DUE TO LACK OF MEM
+    for i in range(sequence_len):
+        if i + sequence_len + pred_len + offset >= len(trace_list):
+            break
+
+        example_datum = np.zeros(label_card)
+        example_datum[int(trace_list[i])] = 1
+        list_of_examples.append(example_datum)
+
+        label_datum = np.zeros(label_card * pred_len)
+
+        for j in range(pred_len):
+            task_num = trace_list[i + offset + j + 1]
+            label_datum[j * label_card + int(task_num)] = 1
+
+        list_of_labels.append(label_datum)
+
+    return (list_of_examples, list_of_labels)
+
+
 def chunk_examples(examples, labels, start_index, end_index):
     if len(examples) != len(labels):
         raise ValueError("length of examples and labels do not match")
@@ -124,13 +164,7 @@ def chunk_examples(examples, labels, start_index, end_index):
     if chunk_size < 1:
         raise ValueError("chrunk_size has value of " + str(chunk_size))
 
-    time_steps = examples[0].shape[0]
-    label_card = examples[0].shape[1]
-    # label_size = labels[0].shape[0]
-
-    example_dataset = np.zeros((chunk_size, time_steps, label_card))
     example_chunk = examples[start_index:end_index]
-    label_dataset = np.zeros((chunk_size, time_steps, label_card))
     label_fold = labels[start_index:end_index]
 
     label_dataset= np.asarray(label_fold, dtype=np.float32)
