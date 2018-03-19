@@ -73,6 +73,32 @@ def list_to_example_sequence(trace_list_old, label_card, offset=0, pred_len=1, s
 
     return (list_of_examples, list_of_labels)
 
+def list_to_example_reg(trace_list_old, label_card, offset=0, pred_len=1, seed=0):
+    old_length = len(trace_list_old)
+    trace_list = cut_random(trace_list_old, int(old_length * 0.1), int(old_length * 0.01), seed)
+    list_of_examples = []
+    list_of_labels = []
+    sequence_len = len(trace_list)
+
+
+    for i in range(sequence_len):
+        if i + pred_len + offset + 1>= len(trace_list):
+            break
+
+        example_datum = np.zeros(label_card)
+        example_datum[int(trace_list[i])] = 1
+        list_of_examples.append(example_datum)
+
+        label_datum = np.zeros(pred_len)
+
+        for j in range(pred_len):
+            task_num = trace_list[i + offset + j + 1]
+            label_datum[j] = task_num
+
+        list_of_labels.append(label_datum)
+
+    return (list_of_examples, list_of_labels)
+
 # cutoff first few sequences of trace
 def cut_random(trace, upper_bound, lower_bound, seed=0):
     random.seed(seed)

@@ -47,7 +47,7 @@ def newText_to_list(fileName):
 
     keeping the gap==offset makes X[1] == Y[0]
 '''
-def list_to_example_sequence(trace_list_old, label_card, offset=0, pred_len=1, seed=0):
+def list_to_example_sequence(trace_list_old, label_card, offset=0, pred_len=1, seed=0, timesteps=1):
     old_length = len(trace_list_old)
     trace_list = cut_random(trace_list_old, int(old_length * 0.1), int(old_length * 0.01), seed)
     list_of_examples = []
@@ -56,17 +56,19 @@ def list_to_example_sequence(trace_list_old, label_card, offset=0, pred_len=1, s
 
 
     for i in range(sequence_len):
-        if i + pred_len + offset + 1>= len(trace_list):
+        if i + pred_len + offset + 1 + timesteps>= len(trace_list):
             break
 
-        example_datum = np.zeros(label_card)
-        example_datum[int(trace_list[i])] = 1
-        list_of_examples.append(example_datum)
+        x = np.zeros(timesteps)
+        for k in range(timesteps):
+            x[k] = int(trace_list[i+k])
+
+        list_of_examples.append(x)
 
         label_datum = np.zeros(label_card * pred_len)
 
         for j in range(pred_len):
-            task_num = trace_list[i + offset + j + 1]
+            task_num = trace_list[i + timesteps + offset + j + 1]
             label_datum[j*label_card + int(task_num)] = 1
 
         list_of_labels.append(label_datum)

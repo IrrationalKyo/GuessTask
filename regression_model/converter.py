@@ -1,5 +1,6 @@
 import numpy as np
 import random
+import math
 
 
 def text_to_list(fileName):
@@ -47,27 +48,63 @@ def newText_to_list(fileName):
 
     keeping the gap==offset makes X[1] == Y[0]
 '''
-def list_to_example_sequence(trace_list_old, label_card, offset=0, pred_len=1, seed=0):
-    old_length = len(trace_list_old)
-    trace_list = cut_random(trace_list_old, int(old_length * 0.1), int(old_length * 0.01), seed)
+def list_to_example_regression(trace_X, trace_Y, timesteps = 1, offset=0, pred_len=1, seed=0):
+    old_length = len(trace_X)
+    trace_list_X = cut_random(trace_X, int(old_length * 0.1), int(old_length * 0.01), seed)
+    trace_list_Y = cut_random(trace_Y, int(old_length * 0.1), int(old_length * 0.01), seed)
+
+    if len(trace_list_X) != len(trace_list_Y):
+        print("THE LIST LENGTH IS DIFFERENT")
+        return
+
     list_of_examples = []
     list_of_labels = []
-    sequence_len = len(trace_list)
+    sequence_len = len(trace_list_X)
 
 
     for i in range(sequence_len):
-        if i + pred_len + offset + 1>= len(trace_list):
+        if i + pred_len + timesteps + offset + 1>= len(trace_list_X):
             break
-
-        example_datum = np.zeros(label_card)
-        example_datum[int(trace_list[i])] = 1
+        example_datum = np.zeros(timesteps)
+        for j in range(timesteps):
+            example_datum[j] = trace_list_X[i+j]
         list_of_examples.append(example_datum)
 
-        label_datum = np.zeros(label_card * pred_len)
+        label_datum = np.zeros(1)
+        for j in range(1):
+            prediction_value = trace_list_Y[i + offset + j]
+            label_datum[j] = prediction_value
 
-        for j in range(pred_len):
-            task_num = trace_list[i + offset + j + 1]
-            label_datum[j*label_card + int(task_num)] = 1
+        list_of_labels.append(label_datum)
+
+    if len(list_of_examples) != len(list_of_labels):
+        print("THE LIST LENGTH IS DIFFERENT")
+        return
+
+
+    return (list_of_examples, list_of_labels)
+
+def list_to_example_regression_ss(trace_X, offset=0, pred_len=1, seed=0):
+    old_length = len(trace_X)
+    trace_list_X = cut_random(trace_X, int(old_length * 0.1), int(old_length * 0.01), seed)
+
+    list_of_examples = []
+    list_of_labels = []
+    sequence_len = len(trace_list_X)
+
+
+    for i in range(sequence_len):
+        if i + pred_len + offset + 1>= len(trace_list_X):
+            break
+
+        example_datum = np.zeros(1)
+        example_datum[0] = trace_list_X[i]
+        list_of_examples.append(example_datum)
+
+        label_datum = np.zeros(pred_len)
+        for j in range(1):
+            prediction_value = trace_list_X[i + offset + j + 1]
+            label_datum[j] = prediction_value
 
         list_of_labels.append(label_datum)
 
@@ -81,8 +118,8 @@ def cut_random(trace, upper_bound, lower_bound, seed=0):
 
 
 def chunk_examples(examples, labels, start_index, end_index):
-    if len(examples) != len(labels):
-        raise ValueError("length of examples and labels do not match")
+    print(len(examples))
+
 
     chunk_size = end_index-start_index
     if chunk_size < 1:
@@ -130,11 +167,13 @@ def mySim_to_list(fileName):
         trace.append(int(raw_trace[i]))
     return trace
 
-def split_train_test(ratio, data_pair):
+def split_train_test(ratio, data_pair, timesteps=1):
     example_list = data_pair[0]
     label_list = data_pair[1]
     train_max_ind =  int(len(example_list) * ratio)
 
+    print(len(example_list))
+    print(len(label_list))
     if len(example_list) != len(label_list):
         raise ValueError("expected example and label to have same number of samples")
 
@@ -144,14 +183,14 @@ def split_train_test(ratio, data_pair):
     return train_x, train_y, test_x, test_y
 
 
-if __name__ == "__main__":
-
-    trace = newText_to_list("./data/size15rep0.data")
-    example = list_to_example_sequence(trace,offset=0, pred_len=1)
-
-    trace_len = len(example[0])
-
-    dataset1 = chunk_examples(example[0], example[1], 0, trace_len)
-
-    print(split_train_test(0.75, dataset1))
-
+# if __name__ == "__main__":
+    #
+    # trace = newText_to_list("./data/size15rep0.data")
+    # example = list_to_example_sequence(trace,offset=0, pred_len=1)
+    #
+    # trace_len = len(example[0])
+    #
+    # dataset1 = chunk_examples(example[0], example[1], 0, trace_len)
+    #
+    # print(split_train_test(0.75, dataset1))
+    #

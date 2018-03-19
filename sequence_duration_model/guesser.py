@@ -2,7 +2,7 @@ import keras
 import pydot_ng as pydot
 from keras import Model
 from keras.models import Sequential
-from keras.layers import Dense, Dropout, CuDNNGRU, TimeDistributed
+from keras.layers import Dense, Dropout, CuDNNLSTM, TimeDistributed, Bidirectional, LSTM
 import numpy as np
 from sklearn.metrics import confusion_matrix
 import re
@@ -48,7 +48,7 @@ def weighted_categorical_crossentropy(weights):
         return loss
     return loss
 
-
+# TODO: CONVERTDICT TO NUMPY ARRAY
 def get_priors(trace):
     prior_count = {}
     normalized = {}
@@ -70,7 +70,13 @@ def get_priors(trace):
     for key, value in inverse.items():
         inverse_output[key] = value
 
+
+
     return None, inverse_output
+
+# turns trace into binary vector
+def mask_trace(value, trace):
+    return
 
 
 def dict_mapper(dic):
@@ -98,35 +104,46 @@ def score_display(fold_scores):
         print("\tfold_avg: "+str(avg[i]))
     total_avg = np.mean(avg)
     print("total_avg: " + str(total_avg))
-
     return total_avg
 
 
 def create_model(cell_count, shape, stateful, batch, output_dim, loss="categorical_crossentropy", drop_out = True, layers=1):
     model = Sequential()
-    model.add(CuDNNGRU(cell_count,
-              input_shape=shape,
-			  batch_size=batch,
-              stateful=stateful,
-			  return_sequences=True, name="lstm_1",
-              ))
-    for i in range(1, layers):
-        model.add(CuDNNGRU(cell_count,
-                            input_shape=shape,
-                            batch_size=batch,
-                            stateful=stateful,
-                            return_sequences=True, name="lstm_" + str(i+1),
-                            ))
-    model.add(TimeDistributed(Dense(math.floor(cell_count / 2), activation='relu')))
-    model.add(TimeDistributed(Dense(math.floor(cell_count / 8), activation='tanh')))
-    if drop_out:
-        model.add(Dropout(0.5))
+    for i in range(layers):
+        if i == 0 and i != layers-1:
+            model.add(Bidirectional(LSTM(cell_count,
+                      stateful=stateful,
+                      return_sequences=True, name="lstm_1",
+                      ), batch_size=batch, input_shape=shape))
 
-    model.add(TimeDistributed(Dense(output_dim, activation='softmax')))
-    rms = keras.optimizers.RMSprop(lr=0.002, clipvalue=100)
+        elif i == 0 and i == layers-1:
+            model.add(Bidirectional(LSTM(cell_count,
+                      stateful=stateful,
+                      return_sequences=False, name="lstm_1",
+                      ), batch_size=batch, input_shape=shape))
+
+        elif i == layers - 1:
+
+            model.add(Bidirectional(LSTM(cell_count,
+                                batch_size=batch,
+                                stateful=stateful,
+                                return_sequences=False, name="lstm_" + str(i+1),
+                                )))
+        else:
+            model.add(Bidirectional(LSTM(cell_count,
+                                              batch_size=batch,
+                                              stateful=stateful,
+                                              return_sequences=True, name="lstm_" + str(i + 1),
+                                              )))
+    model.add(Dense(cell_count * 2, activation='relu'))
+    # if drop_out:
+    #     model.add(Dropout(0.5))
+
+    model.add(Dense(output_dim, activation='softmax', name="output_layer"))
+    rms = keras.optimizers.RMSprop(lr=0.01)
     adam = keras.optimizers.Adam(lr=0.001, beta_1=0.9, beta_2=0.999, epsilon=None, decay=0.0, amsgrad=False)
-    sgd = keras.optimizers.SGD(lr=0.01, momentum=0.0, decay=0.0, nesterov=True)
-    model.compile(loss=loss, optimizer=adam, metrics=['accuracy'], sample_weight_mode="temporal")
+    sgd = keras.optimizers.SGD(lr=0.0001, momentum=0.9, decay=1e-6, nesterov=True)
+    model.compile(loss=loss, optimizer="sgd", metrics=['accuracy'])
     return model
 
 def manual_verification(model, test_dataset, label_card, batch_size=1):
@@ -145,13 +162,13 @@ def manual_verification(model, test_dataset, label_card, batch_size=1):
 
     for k in range(time_step):
         for i in range(len(y)):
-            pred_y = np.argmax(y[i][k])
+            pred_y = np.argmax(y[i])
             true_pred_y.append(pred_y)
-            label = np.argmax(test_dataset[1][i][k])
+            label = np.argmax(test_dataset[1][i])
             true_y.append(label)
     correct = 0
 
-
+    print(pred_y)
     confusion = confusion_matrix(true_y, true_pred_y, labels=range(label_card))
     for i in range(label_card):
         correct += confusion[i][i]
@@ -220,6 +237,8 @@ def run_instance(data_name, cell_size = 32, layers = 1, epoch = 50, batch_size =
 
     trace = cvt.newText_to_list(data_name)
 
+    trace = trace[10000:200000]
+
     prior, inverse = get_priors(trace)
 
 
@@ -247,7 +266,7 @@ def run_instance(data_name, cell_size = 32, layers = 1, epoch = 50, batch_size =
     # sample_weights = np.reshape(list(sample_weights), (math.floor(total_len/timesteps), timesteps))
 
     train_x = np.reshape(train_x, (math.floor(total_len/timesteps), timesteps, label_card))
-    train_y = np.reshape(train_y, (math.floor(total_len/timesteps), timesteps, label_card))
+    train_y = np.reshape(train_y, (math.floor(total_len/timesteps), label_card))
     print(train_x.shape)
     validation_ratio = None
 
@@ -260,7 +279,7 @@ def run_instance(data_name, cell_size = 32, layers = 1, epoch = 50, batch_size =
     test_x = test_x[:total_len]
     test_y = test_y[:total_len]
     test_x = np.reshape(test_x, (math.floor(total_len/timesteps), timesteps, label_card))
-    test_y = np.reshape(test_y, (math.floor(total_len/timesteps), timesteps, label_card))
+    test_y = np.reshape(test_y, (math.floor(total_len/timesteps), label_card))
 
     wcc = weighted_categorical_crossentropy(inverse)
 
@@ -269,8 +288,8 @@ def run_instance(data_name, cell_size = 32, layers = 1, epoch = 50, batch_size =
                          output_dim=label_card * prediction_len,
                          layers=layers,
                          loss=wcc)
-    for i in range(epoch):
-        model.fit(train_x, train_y, epochs=1, batch_size=batch_size, verbose=2, validation_split=validation_ratio)
+    for i in range(1):
+        model.fit(train_x, train_y, epochs=epoch, batch_size=batch_size, verbose=2, validation_split=validation_ratio)
         model.reset_states()
         print("Current epoch: " + str(i))
 
@@ -280,7 +299,8 @@ def run_instance(data_name, cell_size = 32, layers = 1, epoch = 50, batch_size =
     scores = model.evaluate(test_x, test_y, batch_size=batch_size, verbose=2)
     model.reset_states()
     confusion, accuracies = manual_verification(model, (test_x, test_y), label_card, batch_size=batch_size)
-    normal = confusion.astype('float') / confusion.sum(axis=1)[:, np.newaxis]
+    # normal = confusion.astype('float') / confusion.sum(axis=1)[:, np.newaxis]
+    normal = confusion
 
     statJSON = {}
     statJSON["accuracy"] = scores[1]
@@ -300,8 +320,8 @@ if __name__ == "__main__":
 
 
 
-    layer_set = set([1])
-    cell_set = set([512])
+    layer_set = set([3])
+    cell_set = set([128])
     offset_set = set([0])
 
     fileNames = glob.glob('./data/*.data')
@@ -310,7 +330,9 @@ if __name__ == "__main__":
         for layer in layer_set:
             for cell in cell_set:
                 for offset in offset_set:
-                    info = run_instance(filename, cell_size=cell, layers=layer, epoch=1000, batch_size=1000, prediction_len=1, offset=0, timesteps=100)
+
+                    info = run_instance(filename, cell_size=cell, layers=layer, epoch=100, batch_size=128, prediction_len=1, offset=-1, timesteps=1)
+
                     if info is None:
                         continue
                     normal_mat = info[2]
