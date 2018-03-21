@@ -40,7 +40,8 @@ def uniform_sample_trace(sample_gap, trace):
 
 # output two vectors: one for X and the other for Y
 
-
+# TODO: Given a binary trace create regression trace
+# preserve the binary trace.
 def regression_trace(trace):
     X = []
     Y = []
@@ -74,11 +75,6 @@ def regression_trace(trace):
     X_scaled = scaler.fit_transform(np.reshape(X, (len(X), 1)))
     Y_scaled = scaler.fit_transform(np.reshape(Y, (len(Y), 1)))
 
-    # plt.plot(X[10000:10250])
-    # plt.plot(Y[10000:10250])
-    # plt.ylabel("some stuff")
-    # plt.show()
-
     return X_scaled, Y_scaled
 
 
@@ -90,15 +86,11 @@ def save_result(fileName, data_dict):
 
 def create_model(cell_count, shape, stateful, batch, output_dim, loss="mse", drop_out=True, layers=1, timesteps=100):
     model = Sequential()
-    # model.add(TimeDistributed(Dense(cell_count, activation='linear', name="scale_stuff"), batch_size=batch, input_shape=shape))
-    # model.add(TimeDistributed(Dense(cell_count, activation='tanh', name="scale_stuff"), batch_size=batch, input_shape=shape))
-    # model.add(Conv1D(10, math.floor(timesteps/10), use_bias=True))
     model.add(CuDNNGRU(cell_count,
                        stateful=stateful,
                        return_sequences=True, name="lstm_1", batch_size=batch, input_shape=(timesteps, 6), bias_initializer='ones'))
     model.add(Conv1D(math.floor(timesteps / 10), timesteps,
                      use_bias=True, bias_initializer='random_uniform'))
-    # model.add(RepeatVector(shape[0]))
     model.add(CuDNNGRU(math.ceil(cell_count),
                        stateful=stateful,
                        return_sequences=True, name="lstm_2", bias_initializer='ones')
@@ -116,6 +108,52 @@ def create_model(cell_count, shape, stateful, batch, output_dim, loss="mse", dro
     model.compile(loss=loss, optimizer="Nadam", metrics=['accuracy'])
     return model
 
+def create_model_many_many(cell_count, shape, stateful, batch, output_dim, loss="mse", drop_out=True, layers=1, timesteps=100):
+    model = Sequential()
+    model.add(CuDNNGRU(cell_count,
+                       stateful=stateful,
+                       return_sequences=True, name="lstm_1", batch_size=batch, input_shape=(timesteps, 6), bias_initializer='ones'))
+    model.add(CuDNNGRU(math.ceil(cell_count),
+                       stateful=stateful,
+                       return_sequences=True, name="lstm_2", bias_initializer='ones')
+              )
+    model.add(CuDNNGRU(math.ceil(cell_count),
+                       stateful=stateful,
+                       return_sequences=True, name="lstm_3", batch_size=batch, bias_initializer='ones')
+              )
+    model.add(TimeDistributed(Dense(cell_count, activation='tanh',
+                                    name="dense_middle_2", bias_initializer='random_uniform')))
+    model.add(TimeDistributed(Dense(cell_count, activation='linear',
+                                    name="dense_middle_3", bias_initializer='random_uniform')))
+    model.add(TimeDistributed(Dense(output_dim, activation='linear',
+                                    name="output_layer", bias_initializer='random_uniform')))
+    model.compile(loss=loss, optimizer="Nadam", metrics=['accuracy'])
+    return model
+
+def create_model_many_sing(cell_count, shape, stateful, batch, output_dim, loss="mse", drop_out=True, layers=1, timesteps=100):
+    model = Sequential()
+    model.add(CuDNNGRU(cell_count,
+                       stateful=stateful,
+                       return_sequences=True, name="lstm_1", batch_size=batch, input_shape=(timesteps, 6), bias_initializer='ones'))
+    model.add(Conv1D(math.floor(timesteps / 10), timesteps,
+                     use_bias=True, bias_initializer='random_uniform'))
+    model.add(CuDNNGRU(math.ceil(cell_count),
+                       stateful=stateful,
+                       return_sequences=True, name="lstm_2", bias_initializer='ones')
+              )
+    model.add(CuDNNGRU(math.ceil(cell_count),
+                       stateful=stateful,
+                       return_sequences=True, name="lstm_3", batch_size=batch, bias_initializer='ones')
+              )
+    model.add(TimeDistributed(Dense(cell_count, activation='tanh',
+                                    name="dense_middle_2", bias_initializer='random_uniform')))
+    model.add(TimeDistributed(Dense(cell_count, activation='linear',
+                                    name="dense_middle_3", bias_initializer='random_uniform')))
+    model.add(TimeDistributed(Dense(output_dim, activation='linear',
+                                    name="output_layer", bias_initializer='random_uniform')))
+    model.add(TimeDistributed(Dropout(0.5)))
+    model.compile(loss=loss, optimizer="Nadam", metrics=['accuracy'])
+    return model
 
 def manual_verification(model, test_x, test_y, batch_size=100):
     model.reset_states()
