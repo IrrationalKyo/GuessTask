@@ -138,23 +138,6 @@ def manual_verification(model, test_x, test_y, batch_size=100):
         plt.gcf().clear()
     return
 
-
-def self_predict(model, test_dataset, prediction_length, label_card, batch_size=1):
-    return
-
-
-def save_matrix(matrix, filename):
-    with open(filename, "w") as file:
-        for i in range(len(matrix)):
-            for j in range(len(matrix[0])):
-                file.write(str(matrix[i][j]))
-                if j != len(matrix[0]) - 1:
-                    file.write(",")
-            if i != len(matrix) - 1:
-                file.write("\n")
-    return
-
-
 def tasksize_extractor(name):
     splits = re.split('(\d+)', name)
     return int(splits[1])
