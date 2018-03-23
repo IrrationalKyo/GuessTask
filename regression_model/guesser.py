@@ -2,7 +2,7 @@ import keras
 import pydot_ng as pydot
 from keras import Model
 from keras.models import Sequential
-from keras.layers import Dense, Dropout, CuDNNLSTM, TimeDistributed, Bidirectional, LSTM, RepeatVector, LeakyReLU, CuDNNGRU, Conv1D
+from keras.layers import Dense, Dropout, CuDNNLSTM, TimeDistributed, Bidirectional, LSTM, RepeatVector, LeakyReLU, CuDNNGRU, Conv1D, GRU, Flatten, Input
 import numpy as np
 from sklearn.metrics import confusion_matrix
 import re
@@ -40,8 +40,6 @@ def uniform_sample_trace(sample_gap, trace):
 
 # output two vectors: one for X and the other for Y
 
-# TODO: Given a binary trace create regression trace
-# preserve the binary trace.
 def regression_trace(trace):
     X = []
     Y = []
@@ -63,7 +61,6 @@ def regression_trace(trace):
 
     for i in range(len(group_lists)):
         group = group_lists[i]
-        print("group len: " + str(len(group)))
         group_state = group[0]
         if group_state == 0:
             group_state = -1
@@ -83,60 +80,53 @@ def save_result(fileName, data_dict):
         file.write(json.dumps(data_dict, indent=4, sort_keys=True))
     return
 
-
-def create_model(cell_count, shape, stateful, batch, output_dim, loss="mse", drop_out=True, layers=1, timesteps=100):
+def create_model_many_many_seq(cell_count, shape, stateful, batch, output_dim, loss="mse", drop_out=True, layers=1, timesteps=100, optimizer="Nadam"):
     model = Sequential()
-    model.add(CuDNNGRU(cell_count,
-                       stateful=stateful,
-                       return_sequences=True, name="lstm_1", batch_size=batch, input_shape=(timesteps, 6), bias_initializer='ones'))
-    model.add(Conv1D(math.floor(timesteps / 10), timesteps,
-                     use_bias=True, bias_initializer='random_uniform'))
-    model.add(CuDNNGRU(math.ceil(cell_count),
-                       stateful=stateful,
-                       return_sequences=True, name="lstm_2", bias_initializer='ones')
+    model.add(LSTM(cell_count,
+                       return_sequences=True, name="lstm_1", batch_size=batch, input_shape=shape, bias_initializer='ones'))
+    model.add(LSTM(cell_count,
+                       return_sequences=True, name="lstm_2", bias_initializer='ones', dropout=0.3)
               )
-    model.add(CuDNNGRU(math.ceil(cell_count),
-                       stateful=stateful,
-                       return_sequences=True, name="lstm_3", batch_size=batch, bias_initializer='ones')
+    model.add(LSTM(cell_count,
+                   return_sequences=True, name="lstm_3", bias_initializer='ones')
               )
-    model.add(TimeDistributed(Dense(cell_count, activation='tanh',
-                                    name="dense_middle_2", bias_initializer='random_uniform')))
-    model.add(TimeDistributed(Dense(cell_count, activation='linear',
-                                    name="dense_middle_3", bias_initializer='random_uniform')))
-    model.add(TimeDistributed(Dense(output_dim, activation='linear',
+    model.add(LSTM(cell_count,
+                   return_sequences=True, name="lstm_4", bias_initializer='ones')
+              )
+    model.add(LSTM(cell_count,
+                   return_sequences=False, name="lstm_last", bias_initializer='ones', dropout=0.3)
+              )
+    model.add(TimeDistributed(Dense(output_dim, activation='softmax',
                                     name="output_layer", bias_initializer='random_uniform')))
-    model.compile(loss=loss, optimizer="Nadam", metrics=['accuracy'])
+    model.compile(loss=loss, optimizer=optimizer, metrics=['accuracy'])
     return model
 
-def create_model_many_many(cell_count, shape, stateful, batch, output_dim, loss="mse", drop_out=True, layers=1, timesteps=100):
+def create_model_many_sing_seq(cell_count, shape, stateful, batch, output_dim, loss="mse", timesteps=100, optimizer = "Nadam"):
     model = Sequential()
-    model.add(CuDNNGRU(cell_count,
-                       stateful=stateful,
-                       return_sequences=True, name="lstm_1", batch_size=batch, input_shape=(timesteps, 6), bias_initializer='ones'))
-    model.add(CuDNNGRU(math.ceil(cell_count),
-                       stateful=stateful,
-                       return_sequences=True, name="lstm_2", bias_initializer='ones')
-              )
-    model.add(CuDNNGRU(math.ceil(cell_count),
-                       stateful=stateful,
-                       return_sequences=True, name="lstm_3", batch_size=batch, bias_initializer='ones')
-              )
-    model.add(TimeDistributed(Dense(cell_count, activation='tanh',
-                                    name="dense_middle_2", bias_initializer='random_uniform')))
-    model.add(TimeDistributed(Dense(cell_count, activation='linear',
-                                    name="dense_middle_3", bias_initializer='random_uniform')))
-    model.add(TimeDistributed(Dense(output_dim, activation='linear',
-                                    name="output_layer", bias_initializer='random_uniform')))
-    model.compile(loss=loss, optimizer="Nadam", metrics=['accuracy'])
+    model.add(Dense(cell_count, activation='tanh',
+                                    name="dense_middle_1", bias_initializer='random_uniform', batch_size=batch, input_shape=shape))
+    model.add(Dense(cell_count, activation='tanh',
+                                    name="dense_middle_2", bias_initializer='random_uniform'))
+    model.add(Dense(cell_count, activation='tanh',
+                                    name="dense_middle_3", bias_initializer='random_uniform'))
+    model.add(Dropout(0.5))
+    model.add(Dense(cell_count, activation='tanh',
+                                    name="dense_middle_4", bias_initializer='random_uniform'))
+    model.add(Dense(cell_count, activation='tanh',
+                    name="dense_middle_6", bias_initializer='random_uniform'))
+    model.add(Dense(cell_count, activation='tanh',
+                    name="dense_middle_7", bias_initializer='random_uniform'))
+    model.add(Dropout(0.5))
+    model.add(Dense(output_dim, activation='softmax',
+                                    name="output_layer", bias_initializer='random_uniform'))
+    model.compile(loss=loss, optimizer=optimizer, metrics=['accuracy'])
     return model
 
-def create_model_many_sing(cell_count, shape, stateful, batch, output_dim, loss="mse", drop_out=True, layers=1, timesteps=100):
+def create_model_many_sing_reg(cell_count, shape, stateful, batch, output_dim, loss="mse", timesteps=100, optimizer = "Nadam"):
     model = Sequential()
     model.add(CuDNNGRU(cell_count,
                        stateful=stateful,
-                       return_sequences=True, name="lstm_1", batch_size=batch, input_shape=(timesteps, 6), bias_initializer='ones'))
-    model.add(Conv1D(math.floor(timesteps / 10), timesteps,
-                     use_bias=True, bias_initializer='random_uniform'))
+                       return_sequences=True, name="lstm_1", batch_size=batch, input_shape=shape, bias_initializer='ones'))
     model.add(CuDNNGRU(math.ceil(cell_count),
                        stateful=stateful,
                        return_sequences=True, name="lstm_2", bias_initializer='ones')
@@ -145,14 +135,24 @@ def create_model_many_sing(cell_count, shape, stateful, batch, output_dim, loss=
                        stateful=stateful,
                        return_sequences=True, name="lstm_3", batch_size=batch, bias_initializer='ones')
               )
+    model.add(CuDNNGRU(math.ceil(cell_count),
+                       stateful=stateful,
+                       return_sequences=True, name="lstm_4", batch_size=batch, bias_initializer='ones')
+              )
+    model.add(CuDNNGRU(math.ceil(cell_count),
+                       stateful=stateful,
+                       return_sequences=True, name="lstm_5", batch_size=batch, bias_initializer='ones')
+              )
+    model.add(Conv1D(math.floor(timesteps / 10), timesteps,
+                     use_bias=True, bias_initializer='random_uniform'))
     model.add(TimeDistributed(Dense(cell_count, activation='tanh',
                                     name="dense_middle_2", bias_initializer='random_uniform')))
     model.add(TimeDistributed(Dense(cell_count, activation='linear',
                                     name="dense_middle_3", bias_initializer='random_uniform')))
-    model.add(TimeDistributed(Dense(output_dim, activation='linear',
-                                    name="output_layer", bias_initializer='random_uniform')))
     model.add(TimeDistributed(Dropout(0.5)))
-    model.compile(loss=loss, optimizer="Nadam", metrics=['accuracy'])
+    model.add(TimeDistributed(Dense(output_dim, activation='linear',
+                                    name="output_layer", bias_initializer='random_uniform')))
+    model.compile(loss=loss, optimizer=optimizer, metrics=['accuracy'])
     return model
 
 def manual_verification(model, test_x, test_y, batch_size=100):
@@ -192,23 +192,27 @@ def file_exists(fileName):
         return True
     return False
 
-
-def run_instance(data_name, cell_size=32, layers=1, epoch=50, batch_size=32, prediction_len=1, offset=0, validation=True, timesteps=10, target_task=0):
-    # TODO:
+def makeFilenames(data_name, cell_size, layers, epoch, batch_size, timesteps, target_task):
     label_name = tasksize_extractor(data_name)
     rep_number = rep_extractor(data_name)
-    label_card = label_name + 1
 
     result_path = "./result/" + str(label_name) + "_" + str(rep_number) + "/"
-    modelname = result_path + str(cell_size) + "_" + str(layers) + "_" + str(epoch) + "_" + str(batch_size) + "_t" + str(
+    modelname = result_path + str(cell_size) + "_" + str(layers) + "_" + str(epoch) + "_" + str(
+        batch_size) + "_t" + str(
         timesteps) + "_" + str(offset) + "_" + str(target_task) + ".model"
-    statname = result_path + str(cell_size) + "_" + str(layers) + "_" + str(epoch) + "_" + str(batch_size) + "_" + str(
-        prediction_len) + "_" + str(offset) + "_" + str(target_task) + ".json"
+    statname = result_path + str(cell_size) + "_" + str(layers) + "_" + str(epoch) + "_" + str(batch_size) + "_" + str(offset) + "_" + str(target_task) + ".json"
+
+    return result_path, modelname, statname
+
+def run_instance(data_name, cell_size=32, layers=1, epoch=50, batch_size=32, prediction_len=1, offset=0, validation=True, timesteps=10, target_task=0):
+
+    result_path, modelname, statname = makeFilenames(data_name, cell_size, layers, epoch, batch_size, timesteps, target_task)
+
 
     if not os.path.exists(result_path):
         os.makedirs(result_path)
 
-    original_trace = cvt.newText_to_list(data_name)
+    original_trace = cvt.readFile(data_name)
 
     masked_trx = []
     masked_try = []
@@ -224,11 +228,6 @@ def run_instance(data_name, cell_size=32, layers=1, epoch=50, batch_size=32, pre
 
         example = cvt.list_to_example_regression(
             trace_X, trace_Y, timesteps=timesteps, offset=offset + timesteps, pred_len=prediction_len, seed=data_name)
-
-        #  TODO: the chunking from 208 to 210 is not necessary
-        dataset1 = cvt.chunk_examples(
-            example[0], example[1], 0, len(example[0]))
-        print(np.asarray(dataset1[0]))
 
         train_x, train_y, test_x, test_y = cvt.split_train_test(
             0.80, example, timesteps=timesteps)

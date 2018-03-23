@@ -30,7 +30,7 @@ def detect_label_card(trace):
         dic[str(tr)]=1
     return len(dic)
 
-def newText_to_list(fileName):
+def readTraceFile(fileName):
     data_file = open(fileName, 'r')
     sequences = data_file.readlines()[0].split(',')
     trace = list(map(int, list(map(str.strip,sequences))))
@@ -49,30 +49,30 @@ def newText_to_list(fileName):
     keeping the gap==offset makes X[1] == Y[0]
 '''
 def list_to_example_regression(trace_X, trace_Y, timesteps = 1, offset=0, pred_len=1, seed=0):
-    old_length = len(trace_X)
-    trace_list_X = cut_random(trace_X, int(old_length * 0.1), int(old_length * 0.01), seed)
-    trace_list_Y = cut_random(trace_Y, int(old_length * 0.1), int(old_length * 0.01), seed)
+    # old_length = len(trace_X)
+    # trace_X = cut_random(trace_X, int(old_length * 0.1), int(old_length * 0.01), seed)
+    # trace_Y = cut_random(trace_Y, int(old_length * 0.1), int(old_length * 0.01), seed)
 
-    if len(trace_list_X) != len(trace_list_Y):
+    if len(trace_X) != len(trace_Y):
         print("THE LIST LENGTH IS DIFFERENT")
         return
 
     list_of_examples = []
     list_of_labels = []
-    sequence_len = len(trace_list_X)
+    sequence_len = len(trace_X)
 
 
     for i in range(sequence_len):
-        if i + pred_len + timesteps + offset + 1>= len(trace_list_X):
+        if i + pred_len + timesteps + offset + 1>= len(trace_X):
             break
         example_datum = np.zeros(timesteps)
         for j in range(timesteps):
-            example_datum[j] = trace_list_X[i+j]
+            example_datum[j] = trace_X[i+j]
         list_of_examples.append(example_datum)
 
         label_datum = np.zeros(1)
         for j in range(1):
-            prediction_value = trace_list_Y[i + offset + j]
+            prediction_value = trace_Y[i + offset + j]
             label_datum[j] = prediction_value
 
         list_of_labels.append(label_datum)
@@ -83,6 +83,70 @@ def list_to_example_regression(trace_X, trace_Y, timesteps = 1, offset=0, pred_l
 
 
     return (list_of_examples, list_of_labels)
+
+# expects the trace_x to have shape (traceLength, 2)
+# expects the trace_y to have shape (traceLength, 1)
+def organizeTraceManyMultSingUni(trace_X, trace_Y, timesteps, offset):
+    if len(trace_X) != len(trace_Y):
+        print("THE INPUT LIST LENGTH IS DIFFERENT: X= {}, Y= {}".format(len(trace_X),len(trace_Y)))
+        return
+
+    exampleList = []
+    labelList = []
+    sequenceLength = len(trace_X)
+
+    for i in range(sequenceLength):
+        if i + timesteps + offset + 1>= len(trace_X):
+            break
+
+        example_datum = np.zeros((timesteps, 2))
+        for j in range(timesteps):
+            example_datum[j] = trace_X[i+j]
+        exampleList.append(example_datum)
+
+        label_datum = np.zeros(1)
+        prediction_value = trace_Y[i + offset + 1][0]
+        label_datum[0] = prediction_value
+        labelList.append(label_datum)
+
+    if len(exampleList) != len(labelList):
+        print("THE LIST LENGTH IS DIFFERENT")
+        return
+
+    return exampleList, labelList
+
+# expects the trace_x to have shape (traceLength, 2)
+# expects the trace_y to have shape (traceLength, 1)
+# expects the labelList to have shape (batch, timeseries, 1)
+def organizeTraceManyMultManyUni(trace_X, trace_Y, timesteps, offset):
+    if len(trace_X) != len(trace_Y):
+        print("THE INPUT LIST LENGTH IS DIFFERENT: X= {}, Y= {}".format(len(trace_X),len(trace_Y)))
+        return
+
+    exampleList = []
+    labelList = []
+    sequenceLength = len(trace_X)
+
+    for i in range(sequenceLength):
+        if i + timesteps + offset + 1>= len(trace_X):
+            break
+
+        example_datum = np.zeros((timesteps, 2))
+        for j in range(timesteps):
+            example_datum[j] = trace_X[i+j]
+        exampleList.append(example_datum)
+
+        label_datum = np.zeros((timesteps, 1))
+        for j in range(timesteps):
+            prediction_value = trace_Y[i + offset + 1 + j][0]
+            label_datum[j] = prediction_value
+        labelList.append(label_datum)
+
+    if len(exampleList) != len(labelList):
+        print("THE LIST LENGTH IS DIFFERENT")
+        return
+
+    return exampleList, labelList
 
 
 # cutoff first few sequences of trace
