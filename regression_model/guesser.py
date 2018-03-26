@@ -122,6 +122,30 @@ def create_model_many_sing_seq(cell_count, shape, stateful, batch, output_dim, l
     model.compile(loss=loss, optimizer=optimizer, metrics=['accuracy'])
     return model
 
+
+def create_model_many_sing_seq_lstm(cell_count, shape, stateful, batch, output_dim, loss="mse", timesteps=100, optimizer = "Nadam", layers=3):
+    model = Sequential()
+    model.add(CuDNNLSTM(cell_count,
+                   return_sequences=True, name="lstm_1", batch_size=batch, input_shape=shape, bias_initializer='ones'))
+    model.add(CuDNNLSTM(cell_count,
+                   return_sequences=True, name="lstm_2", bias_initializer='ones')
+              )
+    layers = 4
+    for i in range(layers):
+        model.add(CuDNNLSTM(cell_count,
+                       return_sequences=True, name="lstm_" + str(i+3), bias_initializer='ones')
+                  )
+
+    model.add(CuDNNLSTM(cell_count,
+                   return_sequences=False, name="lstm_last", bias_initializer='ones')
+              )
+    # model.add(Dropout(0.5))
+    model.add(Dense(output_dim, activation='softmax',
+                                    name="output_layer", bias_initializer='random_uniform'))
+    model.compile(loss=loss, optimizer=optimizer, metrics=['accuracy'])
+    return model
+
+
 def create_model_many_sing_reg(cell_count, shape, stateful, batch, output_dim, loss="mse", timesteps=100, optimizer = "Nadam"):
     model = Sequential()
     model.add(CuDNNGRU(cell_count,

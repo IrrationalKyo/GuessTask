@@ -11,8 +11,8 @@ def makeFilenames(data_name, cell_size, epoch, batch_size, timesteps, offset):
     label_name = gue.tasksize_extractor(data_name)
     rep_number = gue.rep_extractor(data_name)
 
-    result_path = "./result/" + str(label_name) + "_" + str(rep_number) + "/"
-    id = "c"+ str(cell_size) + "_e" + str(epoch) + "_b" + str(batch_size) + "_ti" + str(timesteps) + "_o" + str(offset)
+    result_path = "./result/" + str(label_name) + "/" + str(rep_number)
+    id = "c"+ str(cell_size) + "_e" + str(epoch) + "_b" + str(batch_size) + "_ti" + str(timesteps) + "_o" + str(offset)+"_lstm"
     modelname = result_path + id + ".model"
     statname = result_path + id + ".json"
 
@@ -56,11 +56,11 @@ def manualConfidentVerification(model, X, Y, confidence, batchSize):
     confidentCount = 0
 
     for i in range(len(predictions)):
-        candidateIndex = np.argmax(predictions[i][0])
-        if predictions[i][0][candidateIndex] > confidence:
+        candidateIndex = np.argmax(predictions[i])
+        if predictions[i][candidateIndex] > confidence:
             confidentCount += 1
             predicted_Y.append(candidateIndex)
-            corresponding_Y.append(np.argmax(Y[i][0]))
+            corresponding_Y.append(np.argmax(Y[i]))
 
     correct = 0
 
@@ -141,18 +141,18 @@ if __name__ == "__main__":
 
     trainSplit = 0.8
 
-    labelCard = 16
-    epoch = 48
+
+    epoch = 50
     batchSize = 100
     timesteps = 10
     offset = 10000
-    cell_size = labelCard * 2
 
     fileNames = glob.glob('./data/*.data')
 
     for fileName in fileNames:
 
         label_card = gue.tasksize_extractor(fileName)+1
+        cell_size = 64
 
         modelExists = False
 
@@ -205,7 +205,7 @@ if __name__ == "__main__":
         train_Y = train_Y[:total_len]
 
         train_X = np.reshape(train_X, (total_len, timesteps, label_card*2))
-        train_Y = np.reshape(train_Y, (total_len, 1, label_card))
+        train_Y = np.reshape(train_Y, (total_len, label_card))
 
         print(train_X[0])
         print(train_Y[0])
@@ -220,7 +220,7 @@ if __name__ == "__main__":
         test_Y = test_Y[:total_len]
 
         test_X = np.reshape(test_X, (total_len, timesteps, label_card*2))
-        test_Y = np.reshape(test_Y, (total_len, 1, label_card))
+        test_Y = np.reshape(test_Y, (total_len, label_card))
         wcc = weighted_categorical_crossentropy(inverse)
 
         #####
@@ -231,12 +231,14 @@ if __name__ == "__main__":
 
 
         else:
-            model = gue.create_model_many_sing_seq(cell_size, (timesteps, label_card*2), False,
+            model = gue.create_model_many_sing_seq_lstm(cell_size, (timesteps, label_card*2), False,
                                  batchSize,
                                  output_dim=label_card,
                                  timesteps=timesteps,
                                  loss=wcc,
-                                 optimizer="adam")
+                                 optimizer="adam",
+                                 layers=label_card-3)
+            model.summary()
 
             for i in range(1):
                 model.fit(train_X, train_Y, epochs=epoch, batch_size=batchSize,
