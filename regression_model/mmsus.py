@@ -143,8 +143,8 @@ if __name__ == "__main__":
 
 
     epoch = 50
-    batchSize = 100
-    timesteps = 10
+    batchSize = 400
+    timesteps = 30
     offset = 10000
 
     fileNames = glob.glob('./data/*.data')
@@ -226,7 +226,7 @@ if __name__ == "__main__":
         #####
         if modelExists:
             model = keras.models.load_model(modelname, custom_objects={"loss":wcc})
-            y_pred, y_true = manualConfidentVerification(model, test_X, test_Y, 0.95, batchSize)
+            y_pred, y_true = manualConfidentVerification(model, test_X, test_Y, 0.99, batchSize)
             # y_pred, y_true = manualVerification(model, test_X, test_Y, batchSize)
 
 
@@ -254,4 +254,4 @@ if __name__ == "__main__":
 
             scores = model.evaluate(test_X, test_Y, batch_size=batchSize, verbose=2)
             model.reset_states()
-            y_pred, y_true = manualConfidentVerification(model, test_X, test_Y, 0.90, batchSize)
+            y_pred, y_true = manualConfidentVerification(model, test_X, test_Y, 0.99, batchSize)

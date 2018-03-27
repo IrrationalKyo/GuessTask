@@ -128,18 +128,18 @@ def create_model_many_sing_seq_lstm(cell_count, shape, stateful, batch, output_d
     model.add(CuDNNLSTM(cell_count,
                    return_sequences=True, name="lstm_1", batch_size=batch, input_shape=shape, bias_initializer='ones'))
     model.add(CuDNNLSTM(cell_count,
-                   return_sequences=True, name="lstm_2", bias_initializer='ones')
+                   return_sequences=False, name="lstm_2", bias_initializer='ones')
               )
     layers = 4
-    for i in range(layers):
-        model.add(CuDNNLSTM(cell_count,
-                       return_sequences=True, name="lstm_" + str(i+3), bias_initializer='ones')
-                  )
-
-    model.add(CuDNNLSTM(cell_count,
-                   return_sequences=False, name="lstm_last", bias_initializer='ones')
-              )
-    # model.add(Dropout(0.5))
+    # for i in range(layers):
+    #     model.add(CuDNNLSTM(cell_count,
+    #                    return_sequences=True, name="lstm_" + str(i+3), bias_initializer='ones')
+    #               )
+    #
+    # model.add(CuDNNLSTM(cell_count,
+    #                return_sequences=False, name="lstm_last", bias_initializer='ones')
+    #           )
+    model.add(Dropout(0.5))
     model.add(Dense(output_dim, activation='softmax',
                                     name="output_layer", bias_initializer='random_uniform'))
     model.compile(loss=loss, optimizer=optimizer, metrics=['accuracy'])
